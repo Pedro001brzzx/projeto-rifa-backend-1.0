@@ -67,6 +67,7 @@ def registrar_blueprints(app):
         compra_bp,
         ganhador_bp,
         conteudo_bp,
+        pagamento_bp,
         admin_bp
     )
     
@@ -75,6 +76,7 @@ def registrar_blueprints(app):
     app.register_blueprint(compra_bp)
     app.register_blueprint(ganhador_bp)
     app.register_blueprint(conteudo_bp)
+    app.register_blueprint(pagamento_bp)
     app.register_blueprint(admin_bp)
 
 
@@ -94,6 +96,8 @@ def registrar_rota_principal(app):
                 'auth': '/api/auth',
                 'campanhas': '/api/campanhas',
                 'compras': '/api/compras',
+                'checkout': '/api/checkout',
+                'pagamentos': '/api/pagamentos',
                 'ganhadores': '/api/ganhadores',
                 'artigos': '/api/artigos',
                 'comunicados': '/api/comunicados',

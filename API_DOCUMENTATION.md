@@ -13,6 +13,7 @@
 
 - [Autenticação](#autenticação)
 - [Campanhas](#campanhas)
+- [Checkout e Pagamentos](#checkout-e-pagamentos)
 - [Compras e Títulos](#compras-e-títulos)
 - [Ganhadores](#ganhadores)
 - [Admin](#admin)
@@ -573,9 +574,265 @@ Authorization: Bearer {token}
 
 ---
 
+## 💳 Checkout e Pagamentos
+
+> **Novidade:** Sistema completo de checkout e processamento de pagamentos
+
+### 12. Criar Checkout
+
+**Endpoint:** `POST /api/checkout`  
+**Autenticação:** ✅ Requerida  
+**Descrição:** Cria uma compra, gera os títulos e inicia o processo de pagamento
+
+#### Request Headers
+
+```
+Authorization: Bearer {token}
+Content-Type: application/json
+```
+
+#### Request Body
+
+```json
+{
+  "campanha_id": 1,
+  "quantidade_titulos": 10,
+  "metodo_pagamento": "pix"
+}
+```
+
+**Campos obrigatórios:**
+- `campanha_id` (integer)
+- `quantidade_titulos` (integer)
+
+**Campos opcionais:**
+- `metodo_pagamento` (string) - Padrão: `pix`. **Apenas PIX é aceito**
+
+#### Response (201 Created)
+
+```json
+{
+  "mensagem": "Checkout criado com sucesso",
+  "compra_id": 1,
+  "status_pagamento": "pendente",
+  "valor_total": 100.00,
+  "metodo_pagamento": "pix",
+  "pagamento": {
+    "tipo": "pix",
+    "qr_code": "00020126580014br.gov.bcb.pix...",
+    "qr_code_base64": "data:image/png;base64,iVBORw0K...",
+    "copia_cola": "00020126580014br.gov.bcb.pix...",
+    "expira_em": "2026-01-20T12:00:00",
+    "instrucoes": "Escaneie o QR Code ou use o código Pix Copia e Cola para realizar o pagamento"
+  },
+  "compra": {
+    "id": 1,
+    "campanha": {
+      "id": 1,
+      "titulo": "iPhone 15 Pro Max",
+      "slug": "iphone-15-pro-max"
+    },
+    "quantidade_titulos": 10,
+    "valor_total": 100.00,
+    "status_pagamento": "pendente",
+    "metodo_pagamento": "pix",
+    "titulos": [
+      {
+        "id": 1,
+        "numero": "000123",
+        "is_ganhador": false
+      }
+      // ... mais títulos
+    ]
+  }
+}
+```
+
+> 💡 **Nota Importante:** Os dados de pagamento retornados são **exemplos/mockups**. Em produção, integre com um gateway real (Mercado Pago, Asaas, PagSeguro, etc.) para gerar QR codes PIX reais.
+>
+> ⚠️ **Apenas PIX:** O sistema aceita exclusivamente pagamentos via PIX. Outros métodos retornarão erro.
+
+#### Possíveis Erros
+
+```json
+// 400 Bad Request - Dados faltando
+{
+  "erro": "campanha_id e quantidade_titulos são obrigatórios"
+}
+
+// 404 Not Found
+{
+  "erro": "Campanha não encontrada"
+}
+
+// 400 Bad Request
+{
+  "erro": "Campanha não está ativa"
+}
+
+// 400 Bad Request
+{
+  "erro": "Quantidade indisponível. Esta campanha tem 5 título(s) disponível(is).",
+  "titulos_disponiveis": 5
+}
+```
+
+---
+
+### 13. Consultar Pagamento
+
+**Endpoint:** `GET /api/pagamentos/{compra_id}`  
+**Autenticação:** ✅ Requerida  
+**Descrição:** Consulta o status de um pagamento específico
+
+#### Request Headers
+
+```
+Authorization: Bearer {token}
+```
+
+#### Response (200 OK)
+
+```json
+{
+  "compra_id": 1,
+  "status_pagamento": "aprovado",
+  "metodo_pagamento": "pix",
+  "valor_total": 100.00,
+  "data_pagamento": "2026-01-19T12:30:00",
+  "criado_em": "2026-01-19T12:00:00"
+}
+```
+
+**Status possíveis:**
+- `pendente` - Aguardando pagamento
+- `aprovado` - Pagamento confirmado
+- `cancelado` - Pagamento cancelado
+- `recusado` - Pagamento recusado
+
+#### Possíveis Erros
+
+```json
+// 404 Not Found
+{
+  "erro": "Compra não encontrada"
+}
+```
+
+---
+
+### 14. Webhook de Pagamento
+
+**Endpoint:** `POST /api/pagamentos/webhook`  
+**Autenticação:** Não requerida (validar assinatura do gateway)  
+**Descrição:** Recebe notificações de confirmação de pagamento dos gateways
+
+> ⚠️ **IMPORTANTE:** Este endpoint é chamado automaticamente pelo gateway de pagamento. Em produção, você DEVE validar a assinatura/token do gateway para garantir que a requisição é legítima.
+
+#### Query Parameters
+
+| Parâmetro | Tipo | Descrição |
+|-----------|------|-----------|
+| `gateway` | string | Nome do gateway: `mercadopago`, `asaas`, `pagseguro`, etc. |
+
+#### Request Body
+
+```json
+{
+  "compra_id": 1,
+  "status": "aprovado"
+}
+```
+
+**Campos obrigatórios:**
+- `compra_id` (integer)
+
+**Campos opcionais:**
+- `status` (string) - Padrão: `aprovado`. Valores: `aprovado`, `pendente`, `cancelado`, `recusado`
+
+#### Response (200 OK)
+
+```json
+{
+  "mensagem": "Webhook processado com sucesso",
+  "compra_id": 1,
+  "status_anterior": "pendente",
+  "status_atual": "aprovado",
+  "gateway": "mercadopago"
+}
+```
+
+> 📝 **Nota:** Quando o status é alterado para `aprovado`, o sistema automaticamente:
+> - Atualiza `data_pagamento` para o momento atual
+> - Incrementa `titulos_vendidos` da campanha
+> - Torna os títulos visíveis em `/api/meus-titulos`
+
+#### Possíveis Erros
+
+```json
+// 400 Bad Request
+{
+  "erro": "compra_id é obrigatório"
+}
+
+// 400 Bad Request
+{
+  "erro": "Status inválido: xyz"
+}
+
+// 404 Not Found
+{
+  "erro": "Compra não encontrada"
+}
+```
+
+---
+
+### 15. Aprovar Pagamento Manualmente
+
+**Endpoint:** `POST /api/pagamentos/{compra_id}/aprovar`  
+**Autenticação:** ✅ Requerida (Admin)  
+**Descrição:** Aprova um pagamento manualmente (apenas administradores)
+
+> 💡 **Uso:** Útil para pagamentos offline, testes, ou quando há problemas com o webhook do gateway
+
+#### Request Headers
+
+```
+Authorization: Bearer {token}
+```
+
+#### Response (200 OK)
+
+```json
+{
+  "mensagem": "Pagamento aprovado manualmente",
+  "compra_id": 1,
+  "status_anterior": "pendente",
+  "status_atual": "aprovado",
+  "aprovado_por": "Admin Name"
+}
+```
+
+#### Possíveis Erros
+
+```json
+// 403 Forbidden
+{
+  "erro": "Acesso negado"
+}
+
+// 404 Not Found
+{
+  "erro": "Compra não encontrada"
+}
+```
+
+---
+
 ## 🛒 Compras e Títulos
 
-### 12. Criar Compra
+### 16. Criar Compra
 
 **Endpoint:** `POST /api/compras`  
 **Autenticação:** ✅ Requerida  

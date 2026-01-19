@@ -63,8 +63,16 @@ def login_usuario(data):
     Returns:
         tuple: (response dict, status code)
     """
+    # Debug logging (apenas para desenvolvimento)
+    print(f"[LOGIN DEBUG] Dados recebidos: {data}")
+    print(f"[LOGIN DEBUG] Telefone: {data.get('telefone')}")
+    print(f"[LOGIN DEBUG] Senha presente: {bool(data.get('senha'))}")
+    
+    # Validação de campos obrigatórios
+    # Retorna mensagem genérica ao usuário por segurança
     if not data.get('telefone') or not data.get('senha'):
-        return {'erro': 'Telefone e senha são obrigatórios'}, 400
+        print(f"[LOGIN DEBUG] Validação falhou - Telefone: {bool(data.get('telefone'))}, Senha: {bool(data.get('senha'))}")
+        return {'erro': 'Por favor, preencha telefone e senha'}, 400
     
     telefone = data['telefone']
         

@@ -1,7 +1,7 @@
 # Guia de Manutenção - Sistema de Rifas Gêmeos Brasil
 
-**Versão:** 1.1  
-**Última Atualização:** 2026-01-11
+**Versão:** 1.2  
+**Última Atualização:** 2026-01-19
 
 ---
 
@@ -10,6 +10,7 @@
 - [Scripts de Administração](#scripts-de-administração)
 - [Gerenciamento de Usuários](#gerenciamento-de-usuários)
 - [Gerenciamento de Campanhas](#gerenciamento-de-campanhas)
+- [Gerenciamento de Pagamentos](#gerenciamento-de-pagamentos)
 - [Banco de Dados](#banco-de-dados)
 - [Troubleshooting](#troubleshooting)
 - [Backup e Recuperação](#backup-e-recuperação)
@@ -193,6 +194,225 @@ curl -X DELETE http://localhost:5000/api/campanhas/5 \
 ```
 
 > ⚠️ **Importante:** Só é possível deletar campanhas sem compras associadas. Para campanhas com vendas, altere o status para `cancelado`.
+
+---
+
+## 💳 Gerenciamento de Pagamentos
+
+> **Novo:** Sistema de checkout e processamento de pagamentos
+
+### Aprovar Pagamento Manualmente
+
+**Via Script Python:**
+```python
+from app import create_app
+from app.models import db, Compra
+from datetime import datetime
+
+app = create_app()
+with app.app_context():
+    compra_id = 1
+    compra = Compra.query.get(compra_id)
+    
+    if compra:
+        compra.status_pagamento = 'aprovado'
+        compra.data_pagamento = datetime.utcnow()
+        compra.campanha.titulos_vendidos += compra.quantidade_titulos
+        db.session.commit()
+        print(f"✅ Pagamento #{compra_id} aprovado com sucesso!")
+    else:
+        print(f"❌ Compra #{compra_id} não encontrada")
+```
+
+**Via API (Admin):**
+```bash
+curl -X POST http://localhost:5000/api/pagamentos/1/aprovar \
+  -H "Authorization: Bearer {admin_token}"
+```
+
+### Script de Aprovação em Lote
+
+Crie um arquivo `aprovar_pagamentos_lote.py` para aprovar múltiplos pagamentos:
+
+```python
+from app import create_app
+from app.models import db, Compra
+from datetime import datetime
+
+app = create_app()
+
+def aprovar_pendentes():
+    with app.app_context():
+        pendentes = Compra.query.filter_by(status_pagamento='pendente').all()
+        
+        print(f"\n📋 Encontradas {len(pendentes)} compras pendentes\n")
+        
+        for compra in pendentes:
+            print(f"Compra #{compra.id}:")
+            print(f"  - Usuário: {compra.usuario.nome}")
+            print(f"  - Campanha: {compra.campanha.titulo}")
+            print(f"  - Títulos: {compra.quantidade_titulos}")
+            print(f"  - Valor: R$ {compra.valor_total:.2f}")
+            print(f"  - Método: {compra.metodo_pagamento}")
+            
+            resposta = input("  Aprovar? (s/n): ").lower()
+            
+            if resposta == 's':
+                compra.status_pagamento = 'aprovado'
+                compra.data_pagamento = datetime.utcnow()
+                compra.campanha.titulos_vendidos += compra.quantidade_titulos
+                db.session.commit()
+                print("  ✅ Aprovado!\n")
+            else:
+                print("  ⏭️  Pulado\n")
+
+if __name__ == '__main__':
+    aprovar_pendentes()
+```
+
+**Uso:**
+```powershell
+python aprovar_pagamentos_lote.py
+```
+
+### Simular Webhook de Gateway
+
+**Para testar o webhook localmente:**
+
+```bash
+# Simular pagamento aprovado
+curl -X POST "http://localhost:5000/api/pagamentos/webhook?gateway=mercadopago" \
+  -H "Content-Type: application/json" \
+  -d '{"compra_id": 1, "status": "aprovado"}'
+
+# Simular pagamento cancelado
+curl -X POST "http://localhost:5000/api/pagamentos/webhook?gateway=pix" \
+  -H "Content-Type: application/json" \
+  -d '{"compra_id": 2, "status": "cancelado"}'
+```
+
+### Consultar Status de Pagamento
+
+**Via API:**
+```bash
+curl -X GET http://localhost:5000/api/pagamentos/1 \
+  -H "Authorization: Bearer {token}"
+```
+
+**Via SQL:**
+```sql
+SELECT 
+    c.id,
+    u.nome AS usuario,
+    ca.titulo AS campanha,
+    c.quantidade_titulos,
+    c.valor_total,
+    c.status_pagamento,
+    c.metodo_pagamento,
+    c.data_pagamento,
+    c.criado_em
+FROM compras c
+INNER JOIN usuarios u ON c.usuario_id = u.id
+INNER JOIN campanhas ca ON c.campanha_id = ca.id
+WHERE c.status_pagamento = 'pendente'
+ORDER BY c.criado_em DESC;
+```
+
+### Ver Estatísticas de Pagamento
+
+```python
+from app import create_app
+from app.models import Compra
+from sqlalchemy import func
+
+app = create_app()
+with app.app_context():
+    stats = Compra.query.with_entities(
+        Compra.status_pagamento,
+        func.count(Compra.id).label('total'),
+        func.sum(Compra.valor_total).label('valor')
+    ).group_by(Compra.status_pagamento).all()
+    
+    print("\n📊 Estatísticas de Pagamento:\n")
+    for status, total, valor in stats:
+        print(f"{status.upper():12} | {total:4} compras | R$ {valor:10.2f}")
+```
+
+### Integração com Gateways (Produção)
+
+> ⚠️ **Importante:** O sistema atual usa dados mockados. Para produção, integre com um gateway real.
+
+**Gateways Recomendados:**
+
+1. **Mercado Pago**
+   - SDK: `mercadopago`
+   - Documentação: https://www.mercadopago.com.br/developers
+   - Suporta: PIX, Cartão, Boleto
+
+2. **Asaas**
+   - API REST
+   - Documentação: https://docs.asaas.com
+   - Ótimo para PIX e boleto
+
+3. **PagSeguro**
+   - SDK: `pagseguro-python`
+   - Documentação: https://dev.pagseguro.uol.com.br
+
+**Passos para Integração:**
+
+1. Instalar SDK do gateway:
+   ```bash
+   pip install mercadopago
+   ```
+
+2. Configurar credenciais em `.env`:
+   ```
+   GATEWAY_API_KEY=seu_token_aqui
+   GATEWAY_PUBLIC_KEY=sua_public_key_aqui
+   ```
+
+3. Modificar função `_gerar_dados_pagamento` em `pagamento_controller.py`:
+   ```python
+   import mercadopago
+   
+   def _gerar_dados_pagamento(compra, metodo_pagamento):
+       if metodo_pagamento == 'pix':
+           sdk = mercadopago.SDK(os.getenv('GATEWAY_API_KEY'))
+           
+           payment_data = {
+               "transaction_amount": float(compra['valor_total']),
+               "description": f"Compra #{compra['id']}",
+               "payment_method_id": "pix",
+               "payer": {
+                   "email": "usuario@email.com"
+               }
+           }
+           
+           result = sdk.payment().create(payment_data)
+           payment = result["response"]
+           
+           return {
+               "tipo": "pix",
+               "qr_code": payment["point_of_interaction"]["transaction_data"]["qr_code"],
+               "qr_code_base64": payment["point_of_interaction"]["transaction_data"]["qr_code_base64"],
+               # ... demais campos
+           }
+   ```
+
+4. Validar webhook em `pagamento_routes.py`:
+   ```python
+   @pagamento_bp.route('/pagamentos/webhook', methods=['POST'])
+   def processar_webhook():
+       # Validar assinatura do Mercado Pago
+       x_signature = request.headers.get('x-signature')
+       x_request_id = request.headers.get('x-request-id')
+       
+       # Validar conforme documentação do gateway
+       if not validar_assinatura(x_signature, request.data):
+           return jsonify({'erro': 'Assinatura inválida'}), 401
+       
+       # ... resto do código
+   ```
 
 ---
 
@@ -554,5 +774,5 @@ with app.app_context():
 
 ---
 
-**Última Revisão:** 2026-01-11  
+**Última Revisão:** 2026-01-19  
 **Mantenedor:** Equipe Técnica Gêmeos Brasil

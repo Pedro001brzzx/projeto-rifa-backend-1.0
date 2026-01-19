@@ -7,6 +7,7 @@ from app.routes.campanha_routes import campanha_bp
 from app.routes.compra_routes import compra_bp
 from app.routes.ganhador_routes import ganhador_bp
 from app.routes.conteudo_routes import conteudo_bp
+from app.routes.pagamento_routes import pagamento_bp
 
 from app.routes.admin_routes import admin_bp
 
@@ -16,5 +17,6 @@ __all__ = [
     'compra_bp',
     'ganhador_bp',
     'conteudo_bp',
+    'pagamento_bp',
     'admin_bp'
 ]
