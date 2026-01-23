@@ -67,7 +67,7 @@ def _gerar_dados_pagamento(compra, metodo_pagamento):
     # Verificar se está configurado o AbacatePay
     api_key = os.getenv('ABACATEPAY_API_KEY')
     
-    if not api_key or api_key.startswith('sua-api'):
+    if not api_key or api_key.startswith('sua-'):
         # MODO DESENVOLVIMENTO: Retornar mock se não configurado
         print("⚠️ AVISO: AbacatePay não configurado. Usando dados MOCK.")
         return {
@@ -146,13 +146,26 @@ def consultar_pagamento(compra_id):
     if not compra:
         return {'erro': 'Compra não encontrada'}, 404
     
+    # Incluir dados da campanha
+    campanha_data = {
+        'id': compra.campanha.id,
+        'titulo': compra.campanha.titulo,
+        'slug': compra.campanha.slug,
+        'imagem_principal': compra.campanha.imagem_principal,
+        'valor_titulo': float(compra.campanha.valor_titulo),
+        'total_titulos': compra.campanha.total_titulos
+    } if compra.campanha else None
+    
     return {
         'compra_id': compra.id,
         'status_pagamento': compra.status_pagamento,
         'metodo_pagamento': compra.metodo_pagamento,
         'valor_total': float(compra.valor_total),
+        'quantidade_titulos': compra.quantidade_titulos,
         'data_pagamento': compra.data_pagamento.isoformat() if compra.data_pagamento else None,
-        'criado_em': compra.criado_em.isoformat()
+        'criado_em': compra.criado_em.isoformat(),
+        'expira_em': getattr(compra, 'expira_em').isoformat() if getattr(compra, 'expira_em', None) else None,
+        'campanha': campanha_data
     }, 200
 
 

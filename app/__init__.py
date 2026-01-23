@@ -51,6 +51,15 @@ def create_app(config_name='default'):
     # Registrar rota principal
     registrar_rota_principal(app)
     
+    # Inicializar scheduler de tarefas em background
+    try:
+        from app.scheduler import init_scheduler
+        init_scheduler(app)
+    except ImportError:
+        app.logger.warning("APScheduler não instalado. Execute: pip install apscheduler")
+    except Exception as e:
+        app.logger.error(f"Erro ao iniciar scheduler: {str(e)}")
+    
     return app
 
 

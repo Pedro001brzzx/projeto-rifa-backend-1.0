@@ -14,6 +14,7 @@ class Compra(BaseModel):
     metodo_pagamento = db.Column(db.String(50))
     transacao_id = db.Column(db.String(100))
     data_pagamento = db.Column(db.DateTime)
+    expira_em = db.Column(db.DateTime)  # Prazo para pagamento (10 minutos)
 
     usuario = db.relationship('Usuario', back_populates='compras')
     campanha = db.relationship('Campanha', back_populates='compras')
@@ -31,5 +32,6 @@ class Compra(BaseModel):
             'status_pagamento': self.status_pagamento,
             'quantidade_titulos': self.quantidade_titulos,
             'criado_em': self.criado_em.isoformat(),
+            'expira_em': self.expira_em.isoformat() if self.expira_em else None,
             'titulos': [t.to_dict() for t in self.titulos]
         }

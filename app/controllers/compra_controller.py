@@ -65,6 +65,10 @@ def criar_compra(usuario_id, data):
         metodo_pagamento=data.get('metodo_pagamento', 'pix')
     )
     
+    # Definir prazo de expiração (10 minutos)
+    from datetime import datetime, timedelta
+    compra.expira_em = datetime.utcnow() + timedelta(minutes=10)
+    
     db.session.add(compra)
     db.session.flush()
     
