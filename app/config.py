@@ -5,15 +5,19 @@ Configurações da Aplicação Flask - Gêmeos Brasil
 import os
 import secrets
 from datetime import timedelta
+from dotenv import load_dotenv
 
+# Carregar variáveis de ambiente do arquivo .env
+load_dotenv()
 
 class Config:
     """Configurações base da aplicação"""
     
     # Banco de dados
+    basedir = os.path.abspath(os.path.dirname(__file__))
     SQLALCHEMY_DATABASE_URI = os.getenv(
         'DATABASE_URL', 
-        'sqlite:///gemeos_brasil.db'  # SQLite por padrão para desenvolvimento
+        'sqlite:///' + os.path.join(basedir, '..', 'instance', 'rifas.db')
     )
     SQLALCHEMY_TRACK_MODIFICATIONS = False
     
@@ -29,11 +33,7 @@ class Config:
 class DevelopmentConfig(Config):
     """Configurações de desenvolvimento"""
     DEBUG = True
-    # SQLite para desenvolvimento local
-    SQLALCHEMY_DATABASE_URI = os.getenv(
-        'DATABASE_URL',
-        'sqlite:///gemeos_brasil.db'
-    )
+    # Herda SQLALCHEMY_DATABASE_URI da classe Config base
 
 
 class ProductionConfig(Config):

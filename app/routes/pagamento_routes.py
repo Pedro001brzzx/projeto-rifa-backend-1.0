@@ -39,42 +39,19 @@ def processar_webhook():
     
     Suporta AbacatePay com validação HMAC
     """
-    data =request.get_json()
-    gateway = request.args.get('gateway', 'generic')
+    data = request.get_json(silent=True) or {}
+    gateway = request.args.get('gateway', 'abacatepay')  # Default to AbacatePay
     
-    # ABACATEPAY: Validar assinatura HMAC
-    if gateway == 'abacatepay':
-        signature = request.headers.get('X-Webhook-Signature')
-        webhook_secret = os.getenv('ABACATEPAY_WEBHOOK_SECRET')
-        
-        if webhook_secret and signature:
-            # Recalcular HMAC com o body recebido (RAW bytes)
-            body_bytes = request.get_data()
-            expected_signature = hmac.new(
-                webhook_secret.encode(),
-                body_bytes,
-                hashlib.sha256
-            ).hexdigest()
-            
-            # Comparação segura (previne timing attacks)
-            if not hmac.compare_digest(signature, expected_signature):
-                return jsonify({'erro': 'Assinatura inválida'}), 401
-        
-        # Processar evento do AbacatePay
-        if data.get('kind') == 'billing.paid':
-            # Pagamento aprovado!
-            metadata = data.get('data', {}).get('metadata', {})
-            compra_id = int(metadata.get('compra_id'))
-            
-            response, status = pagamento_controller.processar_webhook({
-                'compra_id': compra_id,
-                'status': 'aprovado'
-            }, 'abacatepay')
-            
-            return jsonify(response), status
+    # Capturar signature e body para validação
+    signature = request.headers.get('X-Webhook-Signature')
+    raw_body = request.get_data()
     
-    # Fallback para outros gateways ou testes
-    response, status = pagamento_controller.processar_webhook(data, gateway)
+    response, status = pagamento_controller.processar_webhook(
+        data=data, 
+        gateway=gateway,
+        raw_body=raw_body,
+        signature=signature
+    )
     return jsonify(response), status
 
 

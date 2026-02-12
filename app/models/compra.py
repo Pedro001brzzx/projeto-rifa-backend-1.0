@@ -18,6 +18,7 @@ class Compra(db.Model):
     metodo_pagamento = db.Column(db.String(50))  # pix, cartao, boleto
     transacao_id = db.Column(db.String(100))
     data_pagamento = db.Column(db.DateTime)
+    expira_em = db.Column(db.DateTime, nullable=True)  # Quando a compra pendente expira (10 min)
     criado_em = db.Column(db.DateTime, default=datetime.utcnow)
     
     # Relacionamentos
@@ -34,7 +35,8 @@ class Compra(db.Model):
             'valor_total': float(self.valor_total),
             'status_pagamento': self.status_pagamento,
             'metodo_pagamento': self.metodo_pagamento,
-            'data_pagamento': self.data_pagamento.isoformat() if self.data_pagamento else None,
-            'criado_em': self.criado_em.isoformat(),
+            'data_pagamento': (self.data_pagamento.isoformat() + 'Z') if self.data_pagamento else None,
+            'expira_em': (self.expira_em.isoformat() + 'Z') if self.expira_em else None,
+            'criado_em': self.criado_em.isoformat() + 'Z',
             'titulos': [t.to_dict() for t in self.titulos]
         }

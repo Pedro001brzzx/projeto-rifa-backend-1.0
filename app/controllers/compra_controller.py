@@ -31,28 +31,22 @@ def criar_compra(usuario_id, data):
     
     quantidade = data['quantidade_titulos']
     
-    # Contar títulos já vendidos (aprovados) desta campanha
-    # OTIMIZADO: Query direta sem JOIN (usa índice idx_titulo_campanha)
-    titulos_ja_vendidos = Titulo.query.filter(
-        Titulo.campanha_id == campanha.id
-    ).count()
-    
-    # Validação 1: Verificar limite físico do sistema (máximo 100k números únicos)
-    if titulos_ja_vendidos + quantidade > MAX_TITULOS_POSSIVEIS:
-        disponiveis = MAX_TITULOS_POSSIVEIS - titulos_ja_vendidos
+    # Validar limites de quantidade da campanha
+    if quantidade < campanha.min_quantidade_compra:
         return {
-            'erro': f'Limite máximo de títulos atingido. Apenas {disponiveis} título(s) disponível(is) para esta campanha.',
-            'titulos_disponiveis': disponiveis,
-            'limite_maximo': MAX_TITULOS_POSSIVEIS
+            'erro': f'Quantidade mínima: {campanha.min_quantidade_compra} títulos',
+            'min_quantidade': campanha.min_quantidade_compra
         }, 400
     
-    # Validação 2: Verificar limite configurado da campanha
-    titulos_disponiveis = campanha.total_titulos - campanha.titulos_vendidos
-    if quantidade > titulos_disponiveis:
+    if campanha.max_quantidade_compra and quantidade > campanha.max_quantidade_compra:
         return {
-            'erro': f'Quantidade indisponível. Esta campanha tem {titulos_disponiveis} título(s) disponível(is).',
-            'titulos_disponiveis': titulos_disponiveis
+            'erro': f'Quantidade máxima: {campanha.max_quantidade_compra} títulos',
+            'max_quantidade': campanha.max_quantidade_compra
         }, 400
+    
+    # ⚠️ VALIDAÇÕES DE DISPONIBILIDADE REMOVIDAS
+    # As validações de títulos disponíveis agora são feitas APENAS na aprovação do pagamento
+    # Isso evita bloquear reservas desnecessariamente
     
     valor_total = float(campanha.valor_titulo) * quantidade
     
@@ -65,17 +59,25 @@ def criar_compra(usuario_id, data):
         metodo_pagamento=data.get('metodo_pagamento', 'pix')
     )
     
-    # Definir prazo de expiração (10 minutos)
+    # IMPORTANTE: Definir prazo de expiração (10 minutos) ANTES de adicionar ao session
     from datetime import datetime, timedelta
-    compra.expira_em = datetime.utcnow() + timedelta(minutes=10)
+    expiracao = datetime.utcnow() + timedelta(minutes=10)
+    compra.expira_em = expiracao
+    
+    print(f"🕐 [DEBUG] Compra criada com expira_em: {expiracao.isoformat()}")
     
     db.session.add(compra)
-    db.session.flush()
+    db.session.flush()  # Gera ID da compra
     
-    # Gerar títulos
-    gerar_titulos(compra.id, campanha.id, quantidade)
+    print(f"✅ [DEBUG] Compra #{compra.id} adicionada ao session")
+    
+    # ⚠️ IMPORTANTE: NÃO gerar títulos aqui!
+    # Títulos serão gerados APENAS após aprovação do pagamento
+    # Isso evita reservar números desnecessariamente
     
     db.session.commit()
+    
+    print(f"💾 [DEBUG] Compra #{compra.id} criada SEM títulos (aguardando pagamento)")
     
     return {
         'mensagem': 'Compra realizada com sucesso',
@@ -119,12 +121,10 @@ def gerar_titulos(compra_id, campanha_id, quantidade):
         tentativas = 0
         numero_gerado = False
         
-        # Gerar número único de título (0 a 99999, formatado como 0XXXXX)
+        # Gerar número único de título (100000 a 999999, sem zeros à esquerda)
         while tentativas < MAX_TENTATIVAS:
-            # Gera número de 0 a 99999
-            numero_aleatorio = random.randint(0, 99999)
-            # Formata com 6 dígitos, preenchendo com zeros à esquerda (0XXXXX)
-            numero = f"{numero_aleatorio:06d}"
+            # Gera número de 100000 a 999999 (6 dígitos naturais)
+            numero = str(random.randint(100000, 999999))
             
             # Verifica no set em memória (instantâneo) em vez de query ao banco
             if numero not in numeros_usados:
@@ -158,7 +158,9 @@ def gerar_titulos(compra_id, campanha_id, quantidade):
 
 def listar_compras_usuario(usuario_id, page=1, per_page=20):
     """
-    Lista as compras aprovadas de um usuário
+    Lista TODAS as compras de um usuário (aprovadas, pendentes, expiradas)
+    
+    IMPORTANTE: Compras pendentes aparecem no TOPO para visibilidade
     
     Args:
         usuario_id: ID do usuário
@@ -168,10 +170,24 @@ def listar_compras_usuario(usuario_id, page=1, per_page=20):
     Returns:
         tuple: (response dict, status code)
     """
+    from sqlalchemy import case
+    
+    # Ordenar por status: pendentes primeiro, depois aprovadas, depois expiradas
+    # Dentro de cada grupo, ordenar por data (mais recentes primeiro)
+    status_priority = case(
+        (Compra.status_pagamento == 'pendente', 1),
+        (Compra.status_pagamento == 'aprovado', 2),
+        (Compra.status_pagamento == 'expirado', 3),
+        else_=4
+    )
+    
     compras = Compra.query.filter_by(
-        usuario_id=int(usuario_id),
-        status_pagamento='aprovado'
-    ).order_by(Compra.criado_em.desc()).paginate(
+        usuario_id=int(usuario_id)
+        # SEM FILTRO DE STATUS - retorna TODAS as compras
+    ).order_by(
+        status_priority.asc(),           # Pendentes no topo
+        Compra.criado_em.desc()          # Mais recentes primeiro
+    ).paginate(
         page=page, per_page=per_page, error_out=False
     )
     

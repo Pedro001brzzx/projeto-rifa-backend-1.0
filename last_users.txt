@@ -1,0 +1,3 @@
+Database URI: sqlite:///C:\Projetos\Projeto-rifa\app\..\instance\rifas.db
+Last 5 users:
+ID: 1, Name: Pedro Henrique, Phone: 5583994099696, Email: None, Created: 2026-02-11 20:48:07.530785

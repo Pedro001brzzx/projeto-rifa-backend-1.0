@@ -107,6 +107,8 @@ def criar_campanha(usuario_id, data):
             premio=data.get('premio'),
             valor_titulo=data.get('valor_titulo'),
             total_titulos=data.get('total_titulos'),
+            min_quantidade_compra=data.get('min_quantidade_compra', 1),
+            max_quantidade_compra=data.get('max_quantidade_compra'),
             regulamento=data.get('regulamento')
         )
 
@@ -214,6 +216,8 @@ def atualizar_campanha(usuario_id, campanha_id, data):
     if 'premio' in data: campanha.premio = data['premio']
     if 'valor_titulo' in data: campanha.valor_titulo = data['valor_titulo']
     if 'total_titulos' in data: campanha.total_titulos = data['total_titulos']
+    if 'min_quantidade_compra' in data: campanha.min_quantidade_compra = data['min_quantidade_compra']
+    if 'max_quantidade_compra' in data: campanha.max_quantidade_compra = data['max_quantidade_compra']
     if 'regulamento' in data: campanha.regulamento = data['regulamento']
     if 'status' in data: campanha.status = data['status']
     

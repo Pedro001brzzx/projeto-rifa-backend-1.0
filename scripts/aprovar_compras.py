@@ -1,11 +1,17 @@
 """
-Script para aprovar compras pendentes
-Execute: python aprovar_compras.py
+Script para aprovar manualmente compras pendentes.
+Útil para testes e aprovações administrativas.
 """
 
+import sys
+import os
+
+# Add parent directory to path to import app
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+
+from datetime import datetime
 from app import create_app
 from app.models import db, Compra
-from datetime import datetime
 
 def aprovar_compras():
     app = create_app()
@@ -42,20 +48,32 @@ def aprovar_compras():
             print('❌ Operação cancelada.')
             return
         
-        # Aprovar todas
+        # Aprovar todas usando a função correta que GERA TÍTULOS
+        from app.controllers.pagamento_controller import _aprovar_e_gerar_titulos
+        
+        aprovadas = 0
+        erros = []
+        
         for compra in compras_pendentes:
-            compra.status_pagamento = 'aprovado'
-            compra.data_pagamento = datetime.utcnow()
-            
-            # Atualizar contador de títulos vendidos na campanha
-            campanha = compra.campanha
-            if campanha:
-                campanha.titulos_vendidos = (campanha.titulos_vendidos or 0) + compra.quantidade_titulos
+            try:
+                # Esta função faz TUDO:
+                # - Gera os títulos
+                # - Incrementa contador da campanha
+                # - Atualiza status para 'aprovado'
+                # - Define data_pagamento
+                _aprovar_e_gerar_titulos(compra)
+                aprovadas += 1
+            except Exception as e:
+                erros.append(f"Compra #{compra.id}: {str(e)}")
+                print(f"❌ Erro ao aprovar compra #{compra.id}: {str(e)}")
         
-        db.session.commit()
+        if erros:
+            print(f'\n⚠️ Algumas compras falharam:')
+            for erro in erros:
+                print(f'  - {erro}')
         
-        print(f'\n✅ {len(compras_pendentes)} compra(s) aprovada(s) com sucesso!')
-        print('💡 Contadores de títulos vendidos atualizados nas campanhas!')
+        print(f'\n✅ {aprovadas} compra(s) aprovada(s) com sucesso!')
+        print('🎫 Títulos gerados automaticamente!')
         print('\nAgora você pode testar a rota /api/meus-titulos!')
 
 if __name__ == '__main__':

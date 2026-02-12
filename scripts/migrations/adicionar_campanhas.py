@@ -3,6 +3,13 @@ Script para adicionar campanhas de exemplo ao banco de dados
 Execute: python adicionar_campanhas.py
 """
 
+import sys
+import os
+
+# Add project root to Python path (2 levels up)
+project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..'))
+if project_root not in sys.path:
+    sys.path.insert(0, project_root)
 from datetime import datetime, timedelta
 from app import create_app
 from app.models import db, Campanha
@@ -22,22 +29,8 @@ campanhas_exemplo = [
         'premio': 'iPhone 15 Pro Max 256GB',
         'valor_titulo': 10.00,
         'total_titulos': 5000,
-        'data_sorteio': "Quando o Número de cotas for finalizado",
+        'data_sorteio': None,  # Será "Quando o Número de cotas for finalizado"
         'regulamento': '1. Sorteio pela Loteria Federal\n2. Mínimo 80% dos títulos vendidos\n3. Prêmio entregue em até 7 dias',
-        'status': 'ativo'
-    },
-    {
-        'titulo': 'Notebook Gamer RTX 4060',
-        'descricao': 'Notebook Gamer top de linha: Intel i7, 16GB RAM, RTX 4060, SSD 512GB. Perfeito para jogos e trabalho!',
-        'slug': 'notebook-gamer-rtx-4060',
-        'imagem_principal': 'https://images.unsplash.com/photo-1603302576837-37561b2e2302?w=800',
-        'codigo': 'RIFA002',
-        'tipo': 'regular',
-        'premio': 'Notebook Gamer Acer Nitro 5',
-        'valor_titulo': 15.00,
-        'total_titulos': 3000,
-        'data_sorteio': "Quando o Número de cotas for finalizado",
-        'regulamento': '1. Sorteio pela Loteria Federal\n2. Mínimo 70% dos títulos vendidos\n3. Prêmio entregue em até 15 dias',
         'status': 'ativo'
     },
     {
@@ -50,7 +43,7 @@ campanhas_exemplo = [
         'premio': 'Kit Churrasco Completo',
         'valor_titulo': 5.00,
         'total_titulos': 2000,
-        'data_sorteio': "Quando o Número de cotas for finalizado",
+        'data_sorteio': None,  # Será "Quando o Número de cotas for finalizado"
         'regulamento': '1. Sorteio pela Loteria Federal\n2. Mínimo 60% dos títulos vendidos',
         'status': 'ativo'
     },
@@ -64,7 +57,7 @@ campanhas_exemplo = [
         'premio': 'PlayStation 5 + 2 Controles + Jogo',
         'valor_titulo': 12.00,
         'total_titulos': 4000,
-        'data_sorteio': "Quando o Número de cotas for finalizado",
+        'data_sorteio': None,  # Será "Quando o Número de cotas for finalizado"
         'regulamento': '1. Sorteio pela Loteria Federal\n2. Console novo lacrado\n3. Entrega em até 10 dias',
         'status': 'ativo'
     },
@@ -78,7 +71,7 @@ campanhas_exemplo = [
         'premio': 'Smart TV Samsung 55" 4K',
         'valor_titulo': 8.00,
         'total_titulos': 3500,
-        'data_sorteio': "Quando o Número de cotas for finalizado",
+        'data_sorteio': None,  # Será "Quando o Número de cotas for finalizado"
         'regulamento': '1. Sorteio pela Loteria Federal\n2. TV nova na caixa\n3. Garantia de 1 ano',
         'status': 'ativo'
     }
@@ -109,7 +102,7 @@ def adicionar_campanhas():
             print(f"   📷 Imagem: {dados['imagem_principal'][:50]}...")
             print(f"   💰 Valor: R$ {dados['valor_titulo']:.2f}")
             print(f"   🎫 Títulos: {dados['total_titulos']}")
-            print(f"   📅 Sorteio: {dados['data_sorteio'].strftime('%d/%m/%Y')}")
+            print(f"   📅 Sorteio: Quando o Número de cotas for finalizado")
             print()
             
             campanhas_adicionadas += 1

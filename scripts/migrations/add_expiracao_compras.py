@@ -3,6 +3,13 @@ Script de migração: Adiciona campo expira_em na tabela compras
 Execute: python add_expiracao_compras.py
 """
 
+import sys
+import os
+
+# Add project root to Python path (2 levels up)
+project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..'))
+if project_root not in sys.path:
+    sys.path.insert(0, project_root)
 from app import create_app
 from app.models import db
 

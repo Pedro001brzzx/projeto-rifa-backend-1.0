@@ -1,0 +1,88 @@
+Found 7 tables.
+
+--- TABLE: usuarios ---
+  id (INTEGER) PK NOT NULL
+  nome (VARCHAR(100))  NOT NULL
+  telefone (VARCHAR(20))  NOT NULL
+  email (VARCHAR(120))  
+  senha_hash (VARCHAR(255))  NOT NULL
+  cpf (VARCHAR(14))  
+  data_nascimento (DATE)  
+  endereco (VARCHAR(255))  
+  cidade (VARCHAR(100))  
+  estado (VARCHAR(2))  
+  cep (VARCHAR(10))  
+  is_admin (BOOLEAN)  
+  ativo (BOOLEAN)  
+  criado_em (DATETIME)  
+
+--- TABLE: artigos ---
+  id (INTEGER) PK NOT NULL
+  titulo (VARCHAR(200))  NOT NULL
+  slug (VARCHAR(255))  NOT NULL
+  conteudo (TEXT)  
+  imagem (VARCHAR(500))  
+  autor (VARCHAR(100))  
+  publicado (BOOLEAN)  
+  criado_em (DATETIME)  
+  atualizado_em (DATETIME)  
+
+--- TABLE: comunicados ---
+  id (INTEGER) PK NOT NULL
+  titulo (VARCHAR(200))  NOT NULL
+  conteudo (TEXT)  NOT NULL
+  tipo (VARCHAR(50))  
+  ativo (BOOLEAN)  
+  criado_em (DATETIME)  
+
+--- TABLE: contatos ---
+  id (INTEGER) PK NOT NULL
+  nome (VARCHAR(100))  NOT NULL
+  email (VARCHAR(120))  NOT NULL
+  telefone (VARCHAR(20))  
+  assunto (VARCHAR(200))  
+  mensagem (TEXT)  NOT NULL
+  respondido (BOOLEAN)  
+  criado_em (DATETIME)  
+
+--- TABLE: campanhas ---
+  id (INTEGER) PK NOT NULL
+  titulo (VARCHAR(200))  NOT NULL
+  descricao (TEXT)  
+  slug (VARCHAR(255))  NOT NULL
+  imagem_principal (VARCHAR(500))  
+  codigo (VARCHAR(50))  
+  tipo (VARCHAR(50))  
+  premio (VARCHAR(200))  
+  valor_titulo (NUMERIC(10, 2))  
+  total_titulos (INTEGER)  
+  titulos_vendidos (INTEGER)  
+  data_sorteio (DATETIME)  
+  data_inicio (DATETIME)  
+  data_fim (DATETIME)  
+  status (VARCHAR(20))  
+  numero_sorteado (VARCHAR(50))  
+  ganhador_id (INTEGER)  
+  regulamento (TEXT)  
+  criado_em (DATETIME)  
+  atualizado_em (DATETIME)  
+
+--- TABLE: compras ---
+  id (INTEGER) PK NOT NULL
+  usuario_id (INTEGER)  NOT NULL
+  campanha_id (INTEGER)  NOT NULL
+  quantidade_titulos (INTEGER)  NOT NULL
+  valor_total (NUMERIC(10, 2))  NOT NULL
+  status_pagamento (VARCHAR(20))  
+  metodo_pagamento (VARCHAR(50))  
+  transacao_id (VARCHAR(100))  
+  data_pagamento (DATETIME)  
+  criado_em (DATETIME)  
+
+--- TABLE: titulos ---
+  id (INTEGER) PK NOT NULL
+  compra_id (INTEGER)  NOT NULL
+  campanha_id (INTEGER)  NOT NULL
+  numero (VARCHAR(20))  NOT NULL
+  is_ganhador (BOOLEAN)  
+  criado_em (DATETIME)  

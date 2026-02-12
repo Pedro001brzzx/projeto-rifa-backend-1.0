@@ -20,6 +20,8 @@ class Campanha(db.Model):
     valor_titulo = db.Column(db.Numeric(10, 2))
     total_titulos = db.Column(db.Integer)
     titulos_vendidos = db.Column(db.Integer, default=0)
+    min_quantidade_compra = db.Column(db.Integer, default=1)  # Quantidade mínima por compra
+    max_quantidade_compra = db.Column(db.Integer, nullable=True)  # Quantidade máxima por compra (NULL = sem limite)
     data_sorteio = db.Column(db.DateTime)
     data_inicio = db.Column(db.DateTime, default=datetime.utcnow)
     data_fim = db.Column(db.DateTime)
@@ -48,11 +50,13 @@ class Campanha(db.Model):
             'valor_titulo': float(self.valor_titulo) if self.valor_titulo else None,
             'total_titulos': self.total_titulos,
             'titulos_vendidos': self.titulos_vendidos,
-            'data_sorteio': self.data_sorteio.isoformat() if self.data_sorteio else None,
+            'min_quantidade_compra': self.min_quantidade_compra,
+            'max_quantidade_compra': self.max_quantidade_compra,
+            'data_sorteio': (self.data_sorteio.isoformat() + 'Z') if self.data_sorteio else None,
             'status': self.status,
-            'criado_em': self.criado_em.isoformat(),
-            'data_inicio': self.data_inicio.isoformat() if self.data_inicio else self.criado_em.isoformat(),
-            'data_fim': self.data_fim.isoformat() if self.data_fim else None
+            'criado_em': self.criado_em.isoformat() + 'Z',
+            'data_inicio': (self.data_inicio.isoformat() + 'Z') if self.data_inicio else (self.criado_em.isoformat() + 'Z'),
+            'data_fim': (self.data_fim.isoformat() + 'Z') if self.data_fim else None
         }
         
         if include_stats:

@@ -1,6 +1,13 @@
 """
-Script para executar limpeza manual de compras expiradas
+Script para executar cleanup de compras expiradas
 """
+
+import sys
+import os
+
+# Add parent directory to path to import app
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+
 from app import create_app
 from app.jobs.cleanup_expired_purchases import cancelar_compras_expiradas
 
