@@ -4,11 +4,83 @@ Contém a lógica de negócio para compras e geração de títulos
 """
 
 import random
+import requests
+import os
 from app.models import db, Campanha, Compra, Titulo
 
 # Constante: Número máximo de títulos únicos possíveis
 # Formato 0XXXXX permite números de 000000 a 099999
+# Constante: Número máximo de títulos únicos possíveis
+# Formato 0XXXXX permite números de 000000 a 099999
 MAX_TITULOS_POSSIVEIS = 100000
+
+ABACATEPAY_API_KEY = os.getenv('ABACATEPAY_API_KEY')
+
+
+def criar_pix_qrcode(compra):
+    """
+    Cria QR Code PIX para uma compra usando AbacatePay
+    """
+    if not ABACATEPAY_API_KEY:
+        print("⚠️ [AVISO] ABACATEPAY_API_KEY não configurada")
+        return None
+        
+    try:
+        url = "https://api.abacatepay.com/v1/billing/create"
+        
+        headers = {
+            "Authorization": f"Bearer {ABACATEPAY_API_KEY}",
+            "Content-Type": "application/json"
+        }
+        
+        # Valor em centavos
+        valor_centavos = int(compra.valor_total * 100)
+        
+        payload = {
+            "frequency": "ONE_TIME",
+            "methods": ["PIX"],
+            "products": [
+                {
+                    "externalId": str(compra.id),
+                    "name": "Títulos de Rifa",
+                    "description": f"Compra de {compra.quantidade_titulos} títulos - Campanha: {compra.campanha.titulo}",
+                    "quantity": 1,
+                    "price": valor_centavos
+                }
+            ],
+            "returnUrl": f"http://localhost:5173/checkout", # TODO: Get from env
+            "completionUrl": f"http://localhost:5000/api/pagamentos/webhook", # TODO: Get from env
+            "customer": {
+                "name": compra.usuario.nome or "Cliente",
+                "email": compra.usuario.email or "cliente@email.com",
+                 # "taxId": compra.usuario.cpf, # Omitindo para evitar erro de validação
+                 # "cellphone": compra.usuario.telefone # Omitindo para evitar erro de validação
+            }
+        }
+
+        print(f"🚀 [DEBUG] Criando PIX via Billing API para compra #{compra.id}")
+        
+        response = requests.post(url, json=payload, headers=headers)
+        
+        if response.status_code != 200:
+             print(f"❌ [ERRO] Falha AbacatePay: {response.text}")
+             return None
+             
+        data = response.json()
+        billing_data = data.get('data', {})
+        pix_data = billing_data.get('pixQrCode', {})
+        
+        return {
+            "pix_id": billing_data.get('id'),
+            "qrcode_base64": pix_data.get('qrcodeBase64'), # Billing API uses qrcodeBase64
+            "pix_copia_cola": pix_data.get('brCode', pix_data.get('qrcode')), # brCode or qrcode
+            "expira_em": pix_data.get('expiresAt')
+        }
+
+    except Exception as e:
+        print(f"❌ [ERRO] Falha ao criar PIX direto: {str(e)}")
+        return None
+
 
 
 def criar_compra(usuario_id, data):
@@ -79,10 +151,33 @@ def criar_compra(usuario_id, data):
     
     print(f"💾 [DEBUG] Compra #{compra.id} criada SEM títulos (aguardando pagamento)")
     
-    return {
+    # Gerar PIX QR Code se método for PIX
+    dados_pix = None
+    # ⚠️ FIX: NÃO gerar PIX aqui!
+    # O pagamento agora é gerenciado exclusivamente pelo pagamento_controller._gerar_dados_pagamento
+    # if compra.metodo_pagamento == 'pix':
+    #     try:
+    #         dados_pix = criar_pix_qrcode(compra)
+    #         if dados_pix:
+    #             # Salvar dados do PIX no banco para consulta posterior
+    #             compra.pix_copia_cola = dados_pix['pix_copia_cola']
+    #             compra.pix_qr_code_base64 = dados_pix['qrcode_base64']
+    #             compra.transacao_id = dados_pix['pix_id']
+    #             db.session.commit()
+    #             print(f"✅ [DEBUG] PIX gerado e salvo para compra #{compra.id}")
+    #     except Exception as e:
+    #         print(f"❌ [ERRO] Falha ao gerar PIX: {str(e)}")
+    
+    response_data = {
         'mensagem': 'Compra realizada com sucesso',
         'compra': compra.to_dict()
-    }, 201
+    }
+    
+    # Adicionar dados do PIX à resposta
+    if dados_pix:
+        response_data.update(dados_pix)
+    
+    return response_data, 201
 
 
 def gerar_titulos(compra_id, campanha_id, quantidade):

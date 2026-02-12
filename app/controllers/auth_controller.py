@@ -7,43 +7,52 @@ from flask import jsonify
 from flask_jwt_extended import create_access_token
 from app.models import db, Usuario
 
+from app.utils.helpers import somente_numeros
 
 def registro_usuario(data):
     """
     Registra um novo usuário no sistema
-    
-    Args:
-        data: Dicionário com dados do usuário (nome, telefone, senha, etc)
-    
-    Returns:
-        tuple: (response dict, status code)
     """
-    # Validação
-    if not data.get('telefone') or not data.get('senha') or not data.get('nome'):
-        return {'erro': 'Nome, telefone e senha são obrigatórios'}, 400
+    # Sanitização e Validação
+    nome = str(data.get('nome') or "").strip()
+    email = str(data.get('email') or "").strip().lower()
+    telefone = somente_numeros(data.get('telefone'))
+    cpf = somente_numeros(data.get('cpf'))
+    senha = data.get('senha')
+
+    if not telefone or not senha or not nome or not email or not cpf:
+        return {'erro': 'Nome, e-mail, telefone, CPF e senha são obrigatórios'}, 400
     
+    if len(cpf) != 11:
+        return {'erro': 'CPF deve conter exatamente 11 dígitos'}, 400
+    
+    if len(telefone) < 10:
+        return {'erro': 'Telefone inválido (mínimo 10 dígitos)'}, 400
+
     # Verificar se usuário já existe
-    if Usuario.query.filter_by(telefone=data['telefone']).first():
+    if Usuario.query.filter_by(telefone=telefone).first():
         return {'erro': 'Telefone já cadastrado'}, 400
     
-    if data.get('email') and Usuario.query.filter_by(email=data['email']).first():
+    if Usuario.query.filter_by(email=email).first():
         return {'erro': 'Email já cadastrado'}, 400
+    
+    if Usuario.query.filter_by(cpf=cpf).first():
+        return {'erro': 'CPF já cadastrado'}, 400
     
     # Criar novo usuário
     usuario = Usuario(
-        nome=data['nome'],
-        telefone=data['telefone'],
-        email=data.get('email'),
-        cpf=data.get('cpf'),
+        nome=nome,
+        telefone=telefone,
+        email=email,
+        cpf=cpf,
         cidade=data.get('cidade'),
         estado=data.get('estado')
     )
-    usuario.set_senha(data['senha'])
+    usuario.set_senha(senha)
     
     db.session.add(usuario)
     db.session.commit()
     
-    # Gerar token (JWT requer string como identity)
     token = create_access_token(identity=str(usuario.id))
     
     return {
@@ -55,36 +64,24 @@ def registro_usuario(data):
 
 def login_usuario(data):
     """
-    Realiza login do usuário
-    
-    Args:
-        data: Dicionário com telefone e senha
-    
-    Returns:
-        tuple: (response dict, status code)
+    Realiza login do usuário com sanitização de telefone
     """
-    # Debug logging (apenas para desenvolvimento)
-    print(f"[LOGIN DEBUG] Dados recebidos: {data}")
-    print(f"[LOGIN DEBUG] Telefone: {data.get('telefone')}")
-    print(f"[LOGIN DEBUG] Senha presente: {bool(data.get('senha'))}")
-    
-    # Validação de campos obrigatórios
-    # Retorna mensagem genérica ao usuário por segurança
-    if not data.get('telefone') or not data.get('senha'):
-        print(f"[LOGIN DEBUG] Validação falhou - Telefone: {bool(data.get('telefone'))}, Senha: {bool(data.get('senha'))}")
+    telefone_bruto = data.get('telefone')
+    senha = data.get('senha')
+
+    if not telefone_bruto or not senha:
         return {'erro': 'Por favor, preencha telefone e senha'}, 400
     
-    telefone = data['telefone']
+    telefone = somente_numeros(telefone_bruto)
         
-    # Tenta buscar pelo telefone exato
+    # Tenta buscar pelo telefone purificado
     usuario = Usuario.query.filter_by(telefone=telefone).first()
     
     # Se não encontrou, tenta adicionar o DDI 55 (Brasil) caso o número tenha 10 ou 11 dígitos
-    # Ex: usuário digitou 83994099696, mas no banco está 5583994099696
-    if not usuario and telefone.isdigit() and len(telefone) in [10, 11]:
+    if not usuario and telefone and len(telefone) in [10, 11]:
         usuario = Usuario.query.filter_by(telefone=f"55{telefone}").first()
     
-    if not usuario or not usuario.verificar_senha(data['senha']):
+    if not usuario or not usuario.verificar_senha(senha):
         return {'erro': 'Telefone ou senha inválidos'}, 401
     
     if not usuario.ativo:

@@ -19,6 +19,8 @@ class Compra(db.Model):
     transacao_id = db.Column(db.String(100))
     data_pagamento = db.Column(db.DateTime)
     expira_em = db.Column(db.DateTime, nullable=True)  # Quando a compra pendente expira (10 min)
+    pix_copia_cola = db.Column(db.Text, nullable=True)
+    pix_qr_code_base64 = db.Column(db.Text, nullable=True)
     criado_em = db.Column(db.DateTime, default=datetime.utcnow)
     
     # Relacionamentos
@@ -37,6 +39,8 @@ class Compra(db.Model):
             'metodo_pagamento': self.metodo_pagamento,
             'data_pagamento': (self.data_pagamento.isoformat() + 'Z') if self.data_pagamento else None,
             'expira_em': (self.expira_em.isoformat() + 'Z') if self.expira_em else None,
+            'pix_copia_cola': self.pix_copia_cola,
+            'pix_qr_code_base64': self.pix_qr_code_base64,
             'criado_em': self.criado_em.isoformat() + 'Z',
             'titulos': [t.to_dict() for t in self.titulos]
         }
