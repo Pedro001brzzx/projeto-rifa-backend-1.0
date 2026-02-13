@@ -1,0 +1,81 @@
+﻿❌ ERRO: ABACATEPAY_API_KEY não encontrada no ambiente.
+✅ Chave carregada do .env: abc_d...
+
+🚀 Enviando requisição para AbacatePay...
+{
+  "frequency": "ONE_TIME",
+  "methods": [
+    "PIX"
+  ],
+  "products": [
+    {
+      "externalId": "TEST-DEBUG-001",
+      "name": "Teste de Debug PIX",
+      "description": "Item de teste para valida\u00e7\u00e3o de QR Code",
+      "quantity": 1,
+      "price": 1000
+    }
+  ],
+  "returnUrl": "http://localhost:5173/checkout/sucesso",
+  "completionUrl": "http://localhost:5000/api/pagamentos/webhook",
+  "customer": {
+    "name": "Pedro Henrique",
+    "email": "pedro@exemplo.com",
+    "cellphone": "83994099696",
+    "taxId": "71081729414"
+  }
+}
+
+📡 Status Code: 200
+
+📦 Resposta da API:
+{
+  "success": true,
+  "data": {
+    "products": [
+      {
+        "id": "698f640ed23ce8144fc5ed81",
+        "externalId": "698f640ed23ce8144fc5ed81",
+        "quantity": 1
+      }
+    ],
+    "amount": 1000,
+    "paidAmount": 0,
+    "status": "PENDING",
+    "devMode": true,
+    "methods": [
+      "PIX"
+    ],
+    "frequency": "ONE_TIME",
+    "allowCoupons": false,
+    "coupons": [],
+    "couponsUsed": [],
+    "metadata": {
+      "fee": 80,
+      "returnUrl": "http://localhost:5173/checkout/sucesso",
+      "completionUrl": "http://localhost:5000/api/pagamentos/webhook"
+    },
+    "createdAt": "2026-02-13T17:56:34.686Z",
+    "updatedAt": "2026-02-13T17:56:34.686Z",
+    "id": "bill_hLpY2yERezRjnqAM5eKJTqQK",
+    "url": "https://app.abacatepay.com/pay/bill_hLpY2yERezRjnqAM5eKJTqQK",
+    "customer": {
+      "id": "cust_dnTfkwXDwqQe6An6kBXmXmjx",
+      "metadata": {
+        "name": "Teste User",
+        "cellphone": "83994099696",
+        "taxId": "71081729414",
+        "email": "teste.5851@debug.com",
+        "zipCode": ""
+      }
+    }
+  },
+  "error": null
+}
+
+🔑 CÓDIGO PIX PARA VALIDAÇÃO:
+--------------------------------------------------
+None
+--------------------------------------------------
+
+👉 Copie este código e valide em: https://pix.bcb.gov.br/

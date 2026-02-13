@@ -307,10 +307,6 @@ def _gerar_dados_pagamento(compra, metodo_pagamento, usuario=None):
         try:
             # Tenta converter para JSON, fallbacks para raw text se falhar
             resp_data = response.json()
-            if not resp_data.get('success', True):
-                error_msg = resp_data.get('error', 'Erro reportado pelo gateway')
-                print(f"❌ [API ERROR] AbacatePay: {error_msg}")
-                raise Exception(f'AbacatePay falhou: {error_msg}')
         except (ValueError, json.JSONDecodeError):
             if response.status_code != 200:
                  print(f"❌ [HTTP ERROR] {response.status_code}: {response.text[:200]}")
@@ -319,6 +315,18 @@ def _gerar_dados_pagamento(compra, metodo_pagamento, usuario=None):
             print("⚠️ [WARNING] AbacatePay retornou 200 mas o body não é JSON válido.")
 
         data = response.json()
+        print(f"📦 [DEBUG] Resposta AbacatePay Completa: {json.dumps(data, indent=2)}")
+
+        if not data.get('success', True):
+            error_msg = data.get('error', 'Erro reportado pelo gateway')
+            print(f"❌ [API ERROR] AbacatePay: {error_msg}")
+            
+            if "Failed to create customer" in error_msg:
+                # Mapeia erro de dados inválidos para 400 (ValueError)
+                raise ValueError("Dados do cliente rejeitados pela operadora. Verifique CPF, E-mail e Telefone no seu perfil.")
+            
+            # Mapeia outros erros da API para 400 também, para não gerar 500 desnecessário
+            raise ValueError(f'Recusa da operadora: {error_msg}')
         
         # AbacatePay Billing API: os dados principais ficam em 'data'
         billing_data = data.get('data', {})
@@ -332,25 +340,23 @@ def _gerar_dados_pagamento(compra, metodo_pagamento, usuario=None):
             billing_data.get('pixQrCode', {}).get('brcode') or
             billing_data.get('pix', {}).get('copyPaste') or
             billing_data.get('qrcode') or
-            billing_data.get('brcode')
+            billing_data.get('brcode') or
+            billing_data.get('url')
         )
-        
-        # Fallback Estratégico para Dev/Bills sem PIX imediato
-        # Se a API retornou ID mas não o PIX (comum em faturamentos que geram URL),
-        # usamos a URL ou o ID para gerar um código visível para teste, 
-        # mas priorizamos o erro em produção se necessário.
-        if not pix_payload:
-            if billing_data.get('devMode') or os.getenv('FLASK_ENV') == 'development':
-                print(f"⚠️ [DEV] API não retornou PIX. Gerando payload de teste para Bill {billing_data.get('id')}")
-                pix_payload = f"00020126580014br.gov.bcb.pix0136{billing_data.get('id')}520400005303986"
-            else:
-                print(f"⚠️ [WARNING] Payload PIX não encontrado na resposta real: {data}")
-                # Em produção, se não tiver PIX, o QR Code local falhará
-                # Mas vamos tentar usar o 'url' como fallback para o QR Code se nada mais existir
-                pix_payload = billing_data.get('url')
 
         if not pix_payload:
-            raise Exception("Não foi possível extrair o código PIX da operadora.")
+            # Em DEV mode, a API pode não retornar o QR Code direto (apenas URL)
+            # Nesse caso, criamos um QR Code "fake" baseado no ID para não quebrar o frontend
+            if billing_data.get('devMode') or os.getenv('FLASK_ENV') == 'development':
+                print(f"⚠️ [DEV] API não retornou PIX. Gerando payload de teste para Bill {billing_data.get('id')}")
+                # Mock que o App do banco não vai ler, mas serve para testar o fluxo visual
+                pix_payload = f"00020126580014br.gov.bcb.pix0136{billing_data.get('id')}520400005303986"
+                
+                # Mas avisamos que é teste
+                print("🧪 [TEST MODE] QR Code gerado é simulação. Use o painel AbacatePay para aprovar.")
+            else:
+                # Em PRODUÇÃO, isso é um erro grave
+                raise Exception("API AbacatePay não retornou o código PIX/BRCode.")
 
         # Camada 4: Geração do QR Code Local
         qr_code_base64 = gerar_qrcode_base64(pix_payload)
@@ -358,14 +364,14 @@ def _gerar_dados_pagamento(compra, metodo_pagamento, usuario=None):
         # Retorno Blindado e Rico em dados para o Frontend
         return {
             'tipo': 'pix',
-            'payment_url': billing_data.get('url'),  # URL da página de destino
+            'payment_url': billing_data.get('url') or pix_payload,
             'payment_id': billing_data.get('id'),
-            'pix_code': pix_payload,                 # Código Copia e Cola
-            'qr_code': qr_code_base64,               # Imagem Base64 PNG
-            'copia_cola': pix_payload,               # Legado (compatibilidade)
-            'qr_code_base64': qr_code_base64,        # Legado (compatibilidade)
+            'pix_code': pix_payload,
+            'qr_code': qr_code_base64,
+            'copia_cola': pix_payload,
+            'qr_code_base64': qr_code_base64,
             'expira_em': billing_data.get('expiresAt') or (datetime.utcnow() + timedelta(minutes=10)).isoformat() + 'Z',
-            'instrucoes': 'Escaneie o QR Code ou use o Copia e Cola no app do seu banco.'
+            'instrucoes': 'MODO TESTE: Pague pelo painel AbacatePay ou aguarde (não use app de banco real).' if billing_data.get('devMode') else 'Escaneie o QR Code ou use o Copia e Cola no app do seu banco.'
         }
 
     except ImportError:

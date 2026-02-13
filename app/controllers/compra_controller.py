@@ -14,72 +14,6 @@ from app.models import db, Campanha, Compra, Titulo
 # Formato 0XXXXX permite números de 000000 a 099999
 MAX_TITULOS_POSSIVEIS = 100000
 
-ABACATEPAY_API_KEY = os.getenv('ABACATEPAY_API_KEY')
-
-
-def criar_pix_qrcode(compra):
-    """
-    Cria QR Code PIX para uma compra usando AbacatePay
-    """
-    if not ABACATEPAY_API_KEY:
-        print("⚠️ [AVISO] ABACATEPAY_API_KEY não configurada")
-        return None
-        
-    try:
-        url = "https://api.abacatepay.com/v1/billing/create"
-        
-        headers = {
-            "Authorization": f"Bearer {ABACATEPAY_API_KEY}",
-            "Content-Type": "application/json"
-        }
-        
-        # Valor em centavos
-        valor_centavos = int(compra.valor_total * 100)
-        
-        payload = {
-            "frequency": "ONE_TIME",
-            "methods": ["PIX"],
-            "products": [
-                {
-                    "externalId": str(compra.id),
-                    "name": "Títulos de Rifa",
-                    "description": f"Compra de {compra.quantidade_titulos} títulos - Campanha: {compra.campanha.titulo}",
-                    "quantity": 1,
-                    "price": valor_centavos
-                }
-            ],
-            "returnUrl": f"http://localhost:5173/checkout", # TODO: Get from env
-            "completionUrl": f"http://localhost:5000/api/pagamentos/webhook", # TODO: Get from env
-            "customer": {
-                "name": compra.usuario.nome or "Cliente",
-                "email": compra.usuario.email or "cliente@email.com",
-                 # "taxId": compra.usuario.cpf, # Omitindo para evitar erro de validação
-                 # "cellphone": compra.usuario.telefone # Omitindo para evitar erro de validação
-            }
-        }
-
-        print(f"🚀 [DEBUG] Criando PIX via Billing API para compra #{compra.id}")
-        
-        response = requests.post(url, json=payload, headers=headers)
-        
-        if response.status_code != 200:
-             print(f"❌ [ERRO] Falha AbacatePay: {response.text}")
-             return None
-             
-        data = response.json()
-        billing_data = data.get('data', {})
-        pix_data = billing_data.get('pixQrCode', {})
-        
-        return {
-            "pix_id": billing_data.get('id'),
-            "qrcode_base64": pix_data.get('qrcodeBase64'), # Billing API uses qrcodeBase64
-            "pix_copia_cola": pix_data.get('brCode', pix_data.get('qrcode')), # brCode or qrcode
-            "expira_em": pix_data.get('expiresAt')
-        }
-
-    except Exception as e:
-        print(f"❌ [ERRO] Falha ao criar PIX direto: {str(e)}")
-        return None
 
 
 
@@ -265,23 +199,29 @@ def listar_compras_usuario(usuario_id, page=1, per_page=20):
     Returns:
         tuple: (response dict, status code)
     """
-    from sqlalchemy import case
+    from sqlalchemy import case, and_, or_
+    from datetime import datetime
     
-    # Ordenar por status: pendentes primeiro, depois aprovadas, depois expiradas
-    # Dentro de cada grupo, ordenar por data (mais recentes primeiro)
+    # Data atual para verificar expiração em tempo real
+    now = datetime.utcnow()
+    
+    # Ordenação Inteligente (Frontend Friendly)
+    # 1. PENDENTES VÁLIDOS (Topo da lista): Status pendente E data de expiração no futuro
+    # 2. APROVADOS (Meio): Compras pagas
+    # 3. EXPIRADOS/OUTROS (Fim): Status expirado OU (pendente mas já passou da data)
+    
     status_priority = case(
-        (Compra.status_pagamento == 'pendente', 1),
+        (and_(Compra.status_pagamento == 'pendente', Compra.expira_em > now), 1),
         (Compra.status_pagamento == 'aprovado', 2),
-        (Compra.status_pagamento == 'expirado', 3),
-        else_=4
+        (or_(Compra.status_pagamento == 'expirado', Compra.status_pagamento == 'cancelado'), 3),
+        else_=3 # Pendentes vencidos caem aqui também
     )
     
     compras = Compra.query.filter_by(
         usuario_id=int(usuario_id)
-        # SEM FILTRO DE STATUS - retorna TODAS as compras
     ).order_by(
-        status_priority.asc(),           # Pendentes no topo
-        Compra.criado_em.desc()          # Mais recentes primeiro
+        status_priority.asc(),           # Prioridade calculada
+        Compra.criado_em.desc()          # Mais recentes primeiro dentro do grupo
     ).paginate(
         page=page, per_page=per_page, error_out=False
     )
