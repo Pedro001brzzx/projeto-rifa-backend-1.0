@@ -50,9 +50,14 @@ def criar_compra(usuario_id, data):
             'max_quantidade': campanha.max_quantidade_compra
         }, 400
     
-    # ⚠️ VALIDAÇÕES DE DISPONIBILIDADE REMOVIDAS
-    # As validações de títulos disponíveis agora são feitas APENAS na aprovação do pagamento
-    # Isso evita bloquear reservas desnecessariamente
+    # ✅ VALIDAÇÃO DE DISPONIBILIDADE
+    # Verificar se a quantidade solicitada está disponível
+    titulos_disponiveis = campanha.total_titulos - campanha.titulos_vendidos
+    if quantidade > titulos_disponiveis:
+        return {
+            'erro': f'Quantidade indisponível. Restam apenas alguns títulos.', # Mensagem vaga para o usuário
+            'titulos_disponiveis': titulos_disponiveis # Para o frontend atualizar se necessário
+        }, 400
     
     valor_total = float(campanha.valor_titulo) * quantidade
     
@@ -150,10 +155,11 @@ def gerar_titulos(compra_id, campanha_id, quantidade):
         tentativas = 0
         numero_gerado = False
         
-        # Gerar número único de título (100000 a 999999, sem zeros à esquerda)
+        # Gerar número único de título (000000 a 099999, sem zeros à esquerda)
         while tentativas < MAX_TENTATIVAS:
-            # Gera número de 100000 a 999999 (6 dígitos naturais)
-            numero = str(random.randint(100000, 999999))
+            # Gera número de 000000 a 099999 (5 dígitos, formatados com 6)
+            numero_int = random.randint(0, 99999)
+            numero = f"{numero_int:06d}"
             
             # Verifica no set em memória (instantâneo) em vez de query ao banco
             if numero not in numeros_usados:

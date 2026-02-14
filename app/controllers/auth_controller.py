@@ -96,29 +96,61 @@ def login_usuario(data):
     }, 200
 
 
-def recuperar_senha(data):
+def forgot_password(data):
     """
-    Inicia processo de recuperação de senha
-    
-    Args:
-        data: Dicionário com telefone
-    
-    Returns:
-        tuple: (response dict, status code)
+    Inicia processo de recuperação de senha (Gera token e envia email)
     """
-    if not data.get('telefone'):
-        return {'erro': 'Telefone é obrigatório'}, 400
+    email = data.get('email')
     
-    usuario = Usuario.query.filter_by(telefone=data['telefone']).first()
+    if not email:
+        return {'erro': 'E-mail é obrigatório'}, 400
     
-    if not usuario:
-        return {
-            'mensagem': 'Se o telefone estiver cadastrado, você receberá um SMS com instruções'
-        }, 200
+    usuario = Usuario.query.filter_by(email=email).first()
     
-    # TODO: Implementar envio de SMS com token de recuperação
+    if usuario:
+        token = usuario.generate_reset_token()
+        db.session.commit()
+        
+        # MOCK EMAIL SERVICE (Log de Console)
+        print(f"📧 [EMAIL MOCK] Recuperação de Senha para {email}")
+        print(f"🔗 Link: https://seusite.com/reset-password?token={token}")
+        print(f"🔑 Token: {token}")
+        
+    # Segurança: Nunca revelar se o email existe ou não
+    return {
+        'mensagem': 'Se o e-mail estiver cadastrado, você receberá um link com instruções.'
+    }, 200
+
+
+def reset_password(data):
+    """
+    Redefine a senha usando o token de recuperação
+    """
+    token = data.get('token')
+    nova_senha = data.get('senha')
     
-    return {'mensagem': 'SMS enviado com sucesso'}, 200
+    if not token or not nova_senha:
+        return {'erro': 'Token e nova senha são obrigatórios'}, 400
+        
+    # Validar complexidade da senha (mínimo 6 caracteres por enquanto)
+    if len(nova_senha) < 6:
+        return {'erro': 'A senha deve ter no mínimo 6 caracteres'}, 400
+        
+    usuario = Usuario.query.filter_by(reset_token=token).first()
+    
+    if not usuario or not usuario.is_reset_token_valid(token):
+        return {'erro': 'Token inválido ou expirado'}, 400
+        
+    # Redefinir senha
+    usuario.set_password(nova_senha)
+    
+    # Invalidar token
+    usuario.reset_token = None
+    usuario.reset_token_expiration = None
+    
+    db.session.commit()
+    
+    return {'mensagem': 'Senha redefinida com sucesso! Faço login com sua nova senha.'}, 200
 
 
 def obter_perfil(usuario_id):

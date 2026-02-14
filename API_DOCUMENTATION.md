@@ -1539,14 +1539,33 @@ Para dúvidas ou problemas com a integração:
 
 ---
 
-**Última atualização:** 2026-01-11  
-**Versão da API:** 1.1  
+**Última atualização:** 2026-02-14  
+**Versão da API:** 1.2 (Security Update)  
 **Changelog:**
-- ✅ Flexibilidade de login (telefone com/sem DDI)
-- ✅ Endpoint de logout
-- ✅ Auto-geração de slug em campanhas
-- ✅ Campo `is_admin` em respostas de usuário
-- ✅ Endpoints Admin: listar usuários e dashboard
-- ✅ CRUD completo de campanhas (PUT, DELETE)
-- ✅ DELETE de compras (apenas admin)
-- ✅ `data_sorteio` opcional na criação de campanhas
+- ✅ **Segurança**: Public IDs (UUID) em todas as rotas públicas
+- ✅ **Segurança**: Rate Limiting (Login: 5/min, Geral: 100/min)
+- ✅ **Segurança**: Webhook Signature Validation (AbacatePay)
+- ✅ **Auth**: Recuperação de Senha (Forgot/Reset Password)
+- ✅ **Admin**: Rota de Admin Ofuscada (Security Header) e Audit Logs
+
+---
+
+## 🛡️ Testando Segurança
+
+### 1. Rate Limiting
+Tente fazer login mais de 5 vezes em 1 minuto.
+- **Esperado**: HTTP 429 Too Many Requests
+- **Body**: `{ "message": "5 per minute" }`
+
+### 2. Recuperação de Senha
+- **POST** `/api/auth/forgot-password` com email válido.
+- **Observer**: O token será exibido no console do backend (Ambiente DEV).
+- **POST** `/api/auth/reset-password` com o token e nova senha.
+
+### 3. Webhook AbacatePay
+- Em produção, é obrigatório configurar `ABACATEPAY_WEBHOOK_SECRET`.
+- Requests sem o header `X-Webhook-Signature` correto serão rejeitados com 401.
+
+### 4. Admin Obfuscation
+- A rota `/api/admin` não deve ser acessível diretamente ou deve retornar 404 se não configurada corretamente.
+- A rota real é definida por `ADMIN_ROUTE_SECRET` (Ex: `/api/painel-secreto-x9`).

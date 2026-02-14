@@ -7,6 +7,8 @@ from flask import Blueprint, request, jsonify
 from flask_jwt_extended import jwt_required, get_jwt_identity
 from app.controllers import auth_controller
 
+from app.extensions import limiter
+
 auth_bp = Blueprint('auth', __name__, url_prefix='/api/auth')
 
 
@@ -19,6 +21,7 @@ def registro():
 
 
 @auth_bp.route('/login', methods=['POST'])
+@limiter.limit("5 per minute")
 def login():
     """Endpoint para login de usuário"""
     data = request.get_json()
@@ -26,11 +29,21 @@ def login():
     return jsonify(response), status
 
 
-@auth_bp.route('/recuperar-senha', methods=['POST'])
-def recuperar_senha():
-    """Endpoint para recuperação de senha"""
+@auth_bp.route('/forgot-password', methods=['POST'])
+@limiter.limit("3 per minute")
+def forgot_password():
+    """Endpoint para solicitar recuperação de senha"""
     data = request.get_json()
-    response, status = auth_controller.recuperar_senha(data)
+    response, status = auth_controller.forgot_password(data)
+    return jsonify(response), status
+
+
+@auth_bp.route('/reset-password', methods=['POST'])
+@limiter.limit("5 per minute")
+def reset_password():
+    """Endpoint para redefinir senha com token"""
+    data = request.get_json()
+    response, status = auth_controller.reset_password(data)
     return jsonify(response), status
 
 

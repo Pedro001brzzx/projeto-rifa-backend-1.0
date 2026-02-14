@@ -2,12 +2,7 @@
 Inicialização dos modelos e extensões do banco de dados
 """
 
-from flask_sqlalchemy import SQLAlchemy
-from flask_bcrypt import Bcrypt
-
-# Inicialização das extensões
-db = SQLAlchemy()
-bcrypt = Bcrypt()
+from app.extensions import db, bcrypt
 
 # Importação de todos os modelos
 from app.models.usuario import Usuario
@@ -17,6 +12,7 @@ from app.models.titulo import Titulo
 from app.models.artigo import Artigo
 from app.models.comunicado import Comunicado
 from app.models.contato import Contato
+from app.models.admin_log import AdminLog
 
 __all__ = [
     'db',
@@ -27,5 +23,6 @@ __all__ = [
     'Titulo',
     'Artigo',
     'Comunicado',
-    'Contato'
+    'Contato',
+    'AdminLog'
 ]

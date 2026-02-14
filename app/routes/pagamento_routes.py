@@ -11,6 +11,8 @@ from flask_jwt_extended import jwt_required, get_jwt_identity
 from app.controllers import pagamento_controller
 from utils.decorators import admin_required
 
+from app.utils.admin_logger import with_admin_log
+
 pagamento_bp = Blueprint('pagamentos', __name__, url_prefix='/api')
 
 
@@ -58,6 +60,7 @@ def processar_webhook():
 @pagamento_bp.route('/pagamentos/<int:compra_id>/aprovar', methods=['POST'])
 @jwt_required()
 @admin_required()
+@with_admin_log("Aprovação Manual de Pagamento")
 def aprovar_pagamento_manual(compra_id):
     """Endpoint para aprovar pagamento manualmente (admin only)"""
     admin_id = get_jwt_identity()

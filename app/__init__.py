@@ -7,18 +7,12 @@ from flask import Flask, jsonify
 from flask_cors import CORS
 from flask_jwt_extended import JWTManager
 from app.config import config
-from app.models import db, bcrypt
-
+from app.extensions import db, bcrypt, limiter
+from app.models import * # Import models to ensure they are registered
 
 def create_app(config_name='default'):
     """
     Factory function para criar a aplicação Flask
-    
-    Args:
-        config_name: Nome da configuração a ser usada (default, development, production)
-    
-    Returns:
-        Flask app instance
     """
     app = Flask(__name__)
     
@@ -29,15 +23,26 @@ def create_app(config_name='default'):
     db.init_app(app)
     bcrypt.init_app(app)
     JWTManager(app)
+    limiter.init_app(app)
     
-    # Configurar CORS para aceitar requisições do frontend
+    # Security Headers
+    @app.after_request
+    def apply_security_headers(response):
+        response.headers["X-Content-Type-Options"] = "nosniff"
+        response.headers["X-Frame-Options"] = "DENY"
+        response.headers["X-XSS-Protection"] = "1; mode=block"
+        response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
+        return response
+
+    # Configurar CORS para aceitar requisições do frontend (Produção + Dev)
     CORS(app, resources={
         r"/api/*": {
             "origins": [
-                "http://localhost:3000",  # Create React App
-                "http://localhost:5173",  # Vite
+                "http://localhost:3000",
+                "http://localhost:5173",
                 "http://127.0.0.1:3000",
-                "http://127.0.0.1:5173"
+                "http://127.0.0.1:5173",
+                "https://seudominio.com" # Adicione seu domínio de produção aqui
             ],
             "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
             "allow_headers": ["Content-Type", "Authorization"],

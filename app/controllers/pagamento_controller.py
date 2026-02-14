@@ -505,7 +505,6 @@ def processar_webhook(data, gateway='abacatepay', raw_body=None, signature=None)
     if gateway == 'abacatepay':
         webhook_secret = os.getenv('ABACATEPAY_WEBHOOK_SECRET')
 
-        # Se configurado secret, é OBRIGATÓRIO validar
         if webhook_secret:
             if not raw_body or not signature:
                 print("⛔ Webhook rejeitado: Falta assinatura ou body")
@@ -524,6 +523,11 @@ def processar_webhook(data, gateway='abacatepay', raw_body=None, signature=None)
 
             print("✅ Assinatura do webhook validada com sucesso!")
         else:
+            # Em produção, NÃO ACEITAR sem secret
+            if os.getenv('FLASK_ENV') == 'production':
+                print("❌ ERRO CRÍTICO: ABACATEPAY_WEBHOOK_SECRET não configurado em produção!")
+                return {'erro': 'Erro de configuração no servidor'}, 500
+                
             print("⚠️ AVISO: ABACATEPAY_WEBHOOK_SECRET não configurado. Aceitando webhook inseguro (DEV ONLY).")
 
     # 2. Processar Evento

@@ -8,6 +8,8 @@ from flask_jwt_extended import jwt_required, get_jwt_identity
 from app.controllers import campanha_controller
 from utils.decorators import admin_required
 
+from app.utils.admin_logger import with_admin_log
+
 campanha_bp = Blueprint('campanhas', __name__, url_prefix='/api/campanhas')
 
 
@@ -31,6 +33,8 @@ def detalhes_campanha(slug):
 
 @campanha_bp.route('', methods=['POST'])
 @jwt_required()
+@admin_required()
+@with_admin_log("Criação de Campanha")
 def criar_campanha():
     """Endpoint para criar nova campanha (admin only)"""
     usuario_id = get_jwt_identity()
@@ -42,6 +46,7 @@ def criar_campanha():
 @campanha_bp.route('/<int:campanha_id>', methods=['PUT'])
 @jwt_required()
 @admin_required()
+@with_admin_log("Atualização de Campanha")
 def atualizar_campanha(campanha_id):
     """Endpoint para atualizar campanha (admin only)"""
     usuario_id = get_jwt_identity()
@@ -53,6 +58,7 @@ def atualizar_campanha(campanha_id):
 @campanha_bp.route('/<int:campanha_id>', methods=['DELETE'])
 @jwt_required()
 @admin_required()
+@with_admin_log("Exclusão de Campanha")
 def deletar_campanha(campanha_id):
     """Endpoint para deletar campanha (admin only)"""
     usuario_id = get_jwt_identity()

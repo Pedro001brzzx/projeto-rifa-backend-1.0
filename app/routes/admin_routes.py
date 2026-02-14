@@ -8,7 +8,11 @@ from flask_jwt_extended import jwt_required
 from app.controllers import admin_controller
 from utils.decorators import admin_required
 
-admin_bp = Blueprint('admin', __name__, url_prefix='/api/admin')
+import os
+
+# Security: Obfuscated Admin URL
+ADMIN_PREFIX = os.environ.get('ADMIN_ROUTE_SECRET', '/api/painel-secreto-x9')
+admin_bp = Blueprint('admin', __name__, url_prefix=ADMIN_PREFIX)
 
 @admin_bp.route('/usuarios', methods=['GET'])
 @jwt_required()
