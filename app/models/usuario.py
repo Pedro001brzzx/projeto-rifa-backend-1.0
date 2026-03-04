@@ -16,7 +16,7 @@ class Usuario(db.Model):
     telefone = db.Column(db.String(20), nullable=False)
     email = db.Column(db.String(120), unique=True, nullable=False)
     cpf = db.Column(db.String(14), unique=True, nullable=False)
-    senha_hash = db.Column(db.String(128))
+    senha_hash = db.Column(db.String(255))
     
     is_admin = db.Column(db.Boolean, default=False)
     ativo = db.Column(db.Boolean, default=True) # Added missing field
