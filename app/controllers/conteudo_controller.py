@@ -62,6 +62,81 @@ def listar_comunicados():
     }, 200
 
 
+def criar_comunicado(data):
+    """
+    Cria um novo comunicado
+    
+    Args:
+        data: Dicionário com titulo, conteudo, tipo (opcional)
+    
+    Returns:
+        tuple: (response dict, status code)
+    """
+    if not data.get('titulo') or not data.get('conteudo'):
+        return {'erro': 'Título e conteúdo são obrigatórios'}, 400
+    
+    comunicado = Comunicado(
+        titulo=data['titulo'],
+        conteudo=data['conteudo'],
+        tipo=data.get('tipo', 'informativo'),
+        ativo=data.get('ativo', True)
+    )
+    
+    db.session.add(comunicado)
+    db.session.commit()
+    
+    return {'mensagem': 'Comunicado criado com sucesso', 'comunicado': comunicado.to_dict()}, 201
+
+
+def atualizar_comunicado(comunicado_id, data):
+    """
+    Atualiza um comunicado existente
+    
+    Args:
+        comunicado_id: ID do comunicado
+        data: Dicionário com campos a atualizar
+    
+    Returns:
+        tuple: (response dict, status code)
+    """
+    comunicado = Comunicado.query.get(comunicado_id)
+    if not comunicado:
+        return {'erro': 'Comunicado não encontrado'}, 404
+    
+    if 'titulo' in data:
+        comunicado.titulo = data['titulo']
+    if 'conteudo' in data:
+        comunicado.conteudo = data['conteudo']
+    if 'tipo' in data:
+        comunicado.tipo = data['tipo']
+    if 'ativo' in data:
+        comunicado.ativo = data['ativo']
+    
+    db.session.commit()
+    
+    return {'mensagem': 'Comunicado atualizado', 'comunicado': comunicado.to_dict()}, 200
+
+
+def deletar_comunicado(comunicado_id):
+    """
+    Deleta um comunicado
+    
+    Args:
+        comunicado_id: ID do comunicado
+    
+    Returns:
+        tuple: (response dict, status code)
+    """
+    comunicado = Comunicado.query.get(comunicado_id)
+    if not comunicado:
+        return {'erro': 'Comunicado não encontrado'}, 404
+    
+    db.session.delete(comunicado)
+    db.session.commit()
+    
+    return {'mensagem': 'Comunicado excluído com sucesso'}, 200
+
+
 def enviar_contato(data):
     """
     Registra uma mensagem de contato

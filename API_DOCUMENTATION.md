@@ -2,32 +2,34 @@
 
 > Documentação completa para integração front-end
 
-**Base URL:** `http://localhost:5000`  
-**Versão:** 1.0  
+**Base URL (Produção):** `https://SEU_BACKEND.up.railway.app`  
+**Base URL (Dev):** `http://localhost:5000`  
+**Versão:** 2.0  
 **Formato de resposta:** JSON  
-**Autenticação:** JWT Bearer Token
+**Autenticação:** JWT Bearer Token  
+**Última atualização:** Março 2026
 
 ---
 
 ## 📋 Índice
 
-- [Autenticação](#autenticação)
-- [Campanhas](#campanhas)
-- [Checkout e Pagamentos](#checkout-e-pagamentos)
-- [Compras e Títulos](#compras-e-títulos)
-- [Ganhadores](#ganhadores)
-- [Admin](#admin)
-- [Artigos](#artigos)
-- [Comunicados](#comunicados)
-- [Contato](#contato)
-- [Códigos de Status](#códigos-de-status)
-- [Tipos de Dados](#tipos-de-dados)
+- [Autenticação](#-autenticação)
+- [Campanhas](#-campanhas)
+- [Títulos Premiados](#-títulos-premiados)
+- [Checkout e Pagamentos](#-checkout-e-pagamentos)
+- [Compras e Títulos](#-compras-e-títulos)
+- [Ganhadores](#-ganhadores)
+- [Admin](#-admin)
+- [Comunicados](#-comunicados)
+- [Contato](#-contato)
+- [Deploy (Railway)](#-deploy-railway)
+- [Códigos de Status](#-códigos-de-status)
 
 ---
 
 ## 🔐 Autenticação
 
-Todos os endpoints que requerem autenticação devem incluir o token JWT no header:
+Todos os endpoints protegidos exigem o token JWT no header:
 
 ```
 Authorization: Bearer {token}
@@ -35,274 +37,150 @@ Authorization: Bearer {token}
 
 ### 1. Registro de Usuário
 
-**Endpoint:** `POST /api/auth/registro`  
-**Autenticação:** Não requerida  
-**Descrição:** Registra um novo usuário no sistema
-
-#### Request Body
+**`POST /api/auth/registro`** — Público
 
 ```json
+// Request
 {
   "nome": "João Silva",
   "telefone": "11999999999",
   "senha": "senha123",
   "email": "joao@email.com",
-  "cpf": "123.456.789-00",
+  "cpf": "12345678900",
   "cidade": "São Paulo",
   "estado": "SP"
 }
-```
 
-**Campos obrigatórios:**
-- `nome` (string)
-- `telefone` (string) - Deve ser único
-- `email` (string) - Deve ser único e válido
-- `cpf` (string) - Deve ser único e ter 11 dígitos
-- `senha` (string)
-
-**Campos opcionais:**
-- `cidade` (string)
-- `estado` (string, 2 caracteres)
-
-#### Response (201 Created)
-
-```json
+// Response 201
 {
   "mensagem": "Usuário cadastrado com sucesso",
-  "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+  "token": "eyJhbGci...",
   "usuario": {
     "id": 1,
     "nome": "João Silva",
     "telefone": "11999999999",
     "email": "joao@email.com",
-    "cpf": "123.456.789-00",
+    "cpf": "123.***.***-**",
     "cidade": "São Paulo",
     "estado": "SP",
-    "criado_em": "2026-01-03T00:00:00"
+    "is_admin": false,
+    "criado_em": "2026-03-04T00:00:00"
   }
 }
 ```
 
-#### Possíveis Erros
-
-```json
-// 400 Bad Request - Dados faltando
-{
-  "erro": "Nome, telefone e senha são obrigatórios"
-}
-
-// 400 Bad Request - Telefone já existe
-{
-  "erro": "Telefone já cadastrado"
-}
-
-// 400 Bad Request - Email já existe
-{
-  "erro": "Email já cadastrado"
-}
-```
+> **Campos obrigatórios:** `nome`, `telefone`, `senha`, `email`, `cpf`  
+> **Dados sensíveis:** CPF retornado mascarado na resposta.
 
 ---
 
 ### 2. Login
 
-**Endpoint:** `POST /api/auth/login`  
-**Autenticação:** Não requerida  
-**Descrição:** Autentica um usuário e retorna token JWT
-
-#### Request Body
+**`POST /api/auth/login`** — Público
 
 ```json
+// Request
 {
   "telefone": "11999999999",
   "senha": "senha123"
 }
-```
 
-**Campos obrigatórios:**
-- `telefone` (string) - Pode ser com ou sem código do país (+55)
-- `senha` (string)
-
-> 💡 **Flexibilidade de Telefone:** O sistema aceita login com número local (ex: `83994099696`) ou com código do país (ex: `5583994099696`). Se não encontrar o número exato, tentará adicionar o prefixo 55 automaticamente.
-
-#### Response (200 OK)
-
-```json
+// Response 200
 {
   "mensagem": "Login realizado com sucesso",
-  "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+  "token": "eyJhbGci...",
   "usuario": {
     "id": 1,
     "nome": "João Silva",
     "telefone": "11999999999",
-    "email": "joao@email.com",
-    "cpf": "123.456.789-00",
-    "cidade": "São Paulo",
-    "estado": "SP",
-    "is_admin": false,
-    "criado_em": "2026-01-03T00:00:00"
+    "is_admin": false
   }
 }
 ```
 
-#### Possíveis Erros
-
-```json
-// 400 Bad Request
-{
-  "erro": "Telefone e senha são obrigatórios"
-}
-
-// 401 Unauthorized
-{
-  "erro": "Telefone ou senha inválidos"
-}
-
-// 403 Forbidden
-{
-  "erro": "Usuário inativo"
-}
-```
+> **Flexibilidade de Telefone:** Aceita `83994099696` ou `5583994099696` (com ou sem +55).
 
 ---
 
 ### 3. Logout
 
-**Endpoint:** `POST /api/auth/logout`  
-**Autenticação:** ✅ Requerida  
-**Descrição:** Realiza logout do usuário (principalmente client-side)
-
-#### Request Headers
-
-```
-Authorization: Bearer {token}
-```
-
-#### Response (200 OK)
+**`POST /api/auth/logout`** — 🔒 Requer auth
 
 ```json
-{
-  "mensagem": "Logout realizado com sucesso"
-}
+// Response 200
+{ "mensagem": "Logout realizado com sucesso" }
 ```
-
-> 📝 **Nota:** Como JWT é stateless, o logout é principalmente gerenciado no client-side removendo o token. Este endpoint confirma a ação.
 
 ---
 
-### 4. Recuperar Senha
+### 4. Obter Perfil
 
-**Endpoint:** `POST /api/auth/recuperar-senha`  
-**Autenticação:** Não requerida  
-**Descrição:** Inicia processo de recuperação de senha
-
-#### Request Body
+**`GET /api/auth/perfil`** — 🔒 Requer auth
 
 ```json
-{
-  "telefone": "11999999999"
-}
-```
-
-#### Response (200 OK)
-
-```json
-{
-  "mensagem": "Se o telefone estiver cadastrado, você receberá um SMS com instruções"
-}
-```
-
-> ⚠️ **Nota:** Por segurança, sempre retorna sucesso mesmo se o telefone não existir
-
----
-
-### 5. Obter Perfil
-
-**Endpoint:** `GET /api/auth/perfil`  
-**Autenticação:** ✅ Requerida  
-**Descrição:** Obtém dados do perfil do usuário autenticado
-
-#### Request Headers
-
-```
-Authorization: Bearer {token}
-```
-
-#### Response (200 OK)
-
-```json
+// Response 200
 {
   "id": 1,
   "nome": "João Silva",
   "telefone": "11999999999",
-  "email": "joao@email.com",
-  "cpf": "123.456.789-00",
+  "email": "jo***@email.com",
+  "cpf": "123.***.***-**",
   "cidade": "São Paulo",
   "estado": "SP",
-  "criado_em": "2026-01-03T00:00:00"
+  "is_admin": false,
+  "criado_em": "2026-03-04T00:00:00"
 }
 ```
 
-#### Possíveis Erros
+> **Mascaramento:** Email e CPF retornam mascarados por segurança.
+
+---
+
+### 5. Atualizar Perfil
+
+**`PUT /api/auth/perfil`** — 🔒 Requer auth
 
 ```json
-// 404 Not Found
+// Request (todos opcionais)
 {
-  "erro": "Usuário não encontrado"
+  "nome": "João Santos",
+  "email": "novo@email.com",
+  "cidade": "Rio de Janeiro",
+  "estado": "RJ"
 }
 
-// 401 Unauthorized (token inválido)
+// Response 200
 {
-  "msg": "Missing Authorization Header"
+  "mensagem": "Perfil atualizado com sucesso",
+  "usuario": { ... }
 }
 ```
 
 ---
 
-### 6. Atualizar Perfil
+### 6. Recuperar Senha
 
-**Endpoint:** `PUT /api/auth/perfil`  
-**Autenticação:** ✅ Requerida  
-**Descrição:** Atualiza dados do perfil do usuário
-
-#### Request Headers
-
-```
-Authorization: Bearer {token}
-Content-Type: application/json
-```
-
-#### Request Body
+**`POST /api/auth/esqueci-senha`** — Público
 
 ```json
-{
-  "nome": "João Silva Santos",
-  "email": "joao.novo@email.com",
-  "endereco": "Rua das Flores, 123",
-  "cidade": "Rio de Janeiro",
-  "estado": "RJ",
-  "cep": "20000-000"
-}
+// Request
+{ "email": "joao@email.com" }
+
+// Response 200 (sempre, por segurança)
+{ "mensagem": "Se o email estiver cadastrado, você receberá instruções de recuperação" }
 ```
 
-**Todos os campos são opcionais** - Envie apenas os que deseja atualizar
-
-#### Response (200 OK)
+**`POST /api/auth/redefinir-senha`** — Público
 
 ```json
+// Request
 {
-  "mensagem": "Perfil atualizado com sucesso",
-  "usuario": {
-    "id": 1,
-    "nome": "João Silva Santos",
-    "telefone": "11999999999",
-    "email": "joao.novo@email.com",
-    "cpf": "123.456.789-00",
-    "cidade": "Rio de Janeiro",
-    "estado": "RJ",
-    "criado_em": "2026-01-03T00:00:00"
-  }
+  "token": "token_de_recuperacao",
+  "nova_senha": "novaSenha123"
 }
+
+// Response 200
+{ "mensagem": "Senha redefinida com sucesso" }
 ```
 
 ---
@@ -311,46 +189,36 @@ Content-Type: application/json
 
 ### 7. Listar Campanhas
 
-**Endpoint:** `GET /api/campanhas`  
-**Autenticação:** Não requerida  
-**Descrição:** Lista campanhas com paginação e filtros
-
-#### Query Parameters
+**`GET /api/campanhas`** — Público
 
 | Parâmetro | Tipo | Padrão | Descrição |
 |-----------|------|--------|-----------|
-| `status` | string | `ativo` | Status da campanha: `ativo`, `concluido`, `cancelado` |
-| `page` | integer | `1` | Número da página |
-| `per_page` | integer | `20` | Itens por página (máx: 100) |
-
-#### Exemplo de Request
-
-```
-GET /api/campanhas?status=ativo&page=1&per_page=10
-```
-
-#### Response (200 OK)
+| `status` | string | (todos) | `ativo`, `concluido`, `cancelado` — omitir retorna todos |
+| `page` | integer | `1` | Página |
+| `per_page` | integer | `20` | Itens por página |
 
 ```json
+// Response 200
 {
   "campanhas": [
     {
       "id": 1,
+      "public_id": "uuid-da-campanha",
       "titulo": "iPhone 15 Pro Max",
-      "descricao": "Concorra a um iPhone 15 Pro Max novo",
       "slug": "iphone-15-pro-max",
-      "imagem_principal": "https://exemplo.com/iphone.jpg",
-      "codigo": "CAMP001",
-      "tipo": "regular",
+      "descricao": "...",
+      "imagem_principal": "https://...",
       "premio": "iPhone 15 Pro Max 256GB",
       "valor_titulo": 10.00,
       "total_titulos": 10000,
       "titulos_vendidos": 5432,
-      "data_sorteio": "2026-02-01T20:00:00",
+      "titulos_disponiveis": 4568,
+      "percentual_vendido": 54.32,
+      "data_sorteio": "2026-06-01T20:00:00",
+      "data_conclusao": null,
       "status": "ativo",
       "criado_em": "2026-01-01T00:00:00",
-      "percentual_vendido": 54.32,
-      "titulos_disponiveis": 4568,
+      "min_quantidade_compra": 1,
       "ganhador": null
     }
   ],
@@ -360,50 +228,41 @@ GET /api/campanhas?status=ativo&page=1&per_page=10
 }
 ```
 
+> **Novidade v2:** Sem filtro de status padrão — retorna ativas e concluídas. Campo `data_conclusao` incluído para campanhas finalizadas.
+
 ---
 
 ### 8. Detalhes da Campanha
 
-**Endpoint:** `GET /api/campanhas/{slug}`  
-**Autenticação:** Não requerida  
-**Descrição:** Obtém detalhes completos de uma campanha específica
-
-#### Exemplo de Request
-
-```
-GET /api/campanhas/iphone-15-pro-max
-```
-
-#### Response (200 OK)
+**`GET /api/campanhas/{slug}`** — Público
 
 ```json
+// Response 200 — Campanha ativa
 {
   "id": 1,
+  "public_id": "uuid-da-campanha",
   "titulo": "iPhone 15 Pro Max",
-  "descricao": "Concorra a um iPhone 15 Pro Max novo...",
   "slug": "iphone-15-pro-max",
-  "imagem_principal": "https://exemplo.com/iphone.jpg",
-  "codigo": "CAMP001",
-  "tipo": "regular",
   "premio": "iPhone 15 Pro Max 256GB",
   "valor_titulo": 10.00,
-  "total_titulos": 10000,
-  "titulos_vendidos": 5432,
-  "data_sorteio": "2026-02-01T20:00:00",
   "status": "ativo",
-  "criado_em": "2026-01-01T00:00:00",
-  "percentual_vendido": 54.32,
-  "titulos_disponiveis": 4568,
-  "ganhador": null
+  "ganhador": null,
+  "min_quantidade_compra": 5
 }
-```
 
-#### Possíveis Erros
-
-```json
-// 404 Not Found
+// Response 200 — Campanha concluída
 {
-  "erro": "Campanha não encontrada"
+  "id": 2,
+  "status": "concluido",
+  "data_conclusao": "15/03/2026",
+  "numero_sorteado": "00123",
+  "ganhador": {
+    "nome": "Pedro H***",
+    "telefone": "(**) *****-1234",
+    "premio": "iPhone 15 Pro Max 256GB",
+    "numero_sorteado": "00123",
+    "data_conclusao": "15/03/2026"
+  }
 }
 ```
 
@@ -411,122 +270,51 @@ GET /api/campanhas/iphone-15-pro-max
 
 ### 9. Criar Campanha
 
-**Endpoint:** `POST /api/campanhas`  
-**Autenticação:** ✅ Requerida (Admin)  
-**Descrição:** Cria uma nova campanha (apenas administradores)
-
-#### Request Headers
-
-```
-Authorization: Bearer {token}
-Content-Type: application/json
-```
-
-#### Request Body
+**`POST /api/campanhas`** — 🔒 Admin
 
 ```json
+// Request
 {
   "titulo": "iPhone 15 Pro Max",
-  "descricao": "Concorra a um iPhone 15 Pro Max novo",
-  "slug": "iphone-15-pro-max",
-  "imagem_principal": "https://exemplo.com/iphone.jpg",
-  "codigo": "CAMP001",
-  "tipo": "regular",
+  "descricao": "Concorra a um iPhone...",
+  "imagem_principal": "https://...",
   "premio": "iPhone 15 Pro Max 256GB",
   "valor_titulo": 10.00,
   "total_titulos": 10000,
-  "data_sorteio": "2026-02-01T20:00:00",
-  "regulamento": "1. Compre seus títulos..."
+  "min_quantidade_compra": 1,
+  "max_quantidade_compra": 500,
+  "data_sorteio": "2026-06-01T20:00:00",
+  "regulamento": "1. Regra..."
 }
-```
 
-**Campos obrigatórios:**
-- `titulo` (string)
-
-**Campos opcionais (gerados automaticamente se não fornecidos):**
-- `slug` (string) - Gerado automaticamente do título se não fornecido (ex: "iPhone 15" → "iphone-15")
-- `data_sorteio` (datetime ISO 8601) - Opcional, pode ser definido posteriormente
-- `data_fim` (datetime ISO 8601) - Data de encerramento da campanha
-
-> 💡 **Auto-Slug:** Se o slug não for enviado, o sistema cria automaticamente baseado no título. Se já existir, adiciona um sufixo numérico.
-
-#### Response (201 Created)
-
-```json
+// Response 201
 {
   "mensagem": "Campanha criada com sucesso",
-  "campanha": {
-    "id": 1,
-    "titulo": "iPhone 15 Pro Max",
-    "slug": "iphone-15-pro-max",
-    // ... demais campos
-  }
+  "campanha": { ... }
 }
 ```
 
-#### Possíveis Erros
-
-```json
-// 403 Forbidden
-{
-  "erro": "Acesso negado"
-}
-```
+> **Auto-Slug:** Gerado automaticamente do título se não fornecido.
 
 ---
 
 ### 10. Atualizar Campanha
 
-**Endpoint:** `PUT /api/campanhas/{campanha_id}`  
-**Autenticação:** ✅ Requerida (Admin)  
-**Descrição:** Atualiza uma campanha existente (apenas administradores)
-
-#### Request Headers
-
-```
-Authorization: Bearer {token}
-Content-Type: application/json
-```
-
-#### Request Body
+**`PUT /api/campanhas/{campanha_id}`** — 🔒 Admin  
+Aceita `public_id` (UUID) ou `id` interno.
 
 ```json
+// Request (todos opcionais)
 {
-  "titulo": "iPhone 15 Pro Max ATUALIZADO",
+  "titulo": "Novo Título",
   "status": "concluido",
-  "data_fim": "2026-02-20T20:00:00"
+  "data_sorteio": "2026-07-01T20:00:00"
 }
-```
 
-**Todos os campos são opcionais** - Envie apenas os que deseja atualizar:
-- `titulo`, `descricao`, `slug`, `imagem_principal`, `codigo`
-- `tipo`, `premio`, `valor_titulo`, `total_titulos`
-- `regulamento`, `status`, `data_sorteio`, `data_fim`
-
-#### Response (200 OK)
-
-```json
+// Response 200
 {
   "mensagem": "Campanha atualizada com sucesso",
-  "campanha": {
-    "id": 1,
-    "titulo": "iPhone 15 Pro Max ATUALIZADO",
-    // ... demais campos
-  }
-}
-```
-
-#### Possíveis Erros
-
-```json
-// 403 Forbidden
-{
-  "erro": "Acesso negado"
-}
-
-// 404 Not Found
-{
-  "erro": "Campanha não encontrada"
+  "campanha": { ... }
 }
 ```
 
@@ -534,432 +322,283 @@ Content-Type: application/json
 
 ### 11. Deletar Campanha
 
-**Endpoint:** `DELETE /api/campanhas/{campanha_id}`  
-**Autenticação:** ✅ Requerida (Admin)  
-**Descrição:** Deleta uma campanha (apenas administradores, somente se não houver compras)
-
-#### Request Headers
-
-```
-Authorization: Bearer {token}
-```
-
-#### Response (200 OK)
+**`DELETE /api/campanhas/{campanha_id}`** — 🔒 Admin
 
 ```json
-{
-  "mensagem": "Campanha deletada com sucesso"
-}
-```
+// Response 200
+{ "mensagem": "Campanha deletada com sucesso" }
 
-#### Possíveis Erros
-
-```json
-// 400 Bad Request - Tem compras associadas
+// 400 — Com compras associadas
 {
   "erro": "Não é possível deletar campanha com compras associadas",
-  "sugestao": "Considere alterar o status para 'cancelado' ao invés de deletar"
+  "sugestao": "Considere alterar o status para 'cancelado'"
+}
+```
+
+---
+
+### 12. Buscar Compradores da Campanha
+
+**`GET /api/campanhas/{campanha_id}/compradores?q={termo}`** — 🔒 Admin
+
+Busca compradores aprovados por nome, telefone ou número de cota.
+
+```json
+// Response 200
+{
+  "compradores": [
+    {
+      "compra_id": 45,
+      "titulo_id": 1230,
+      "usuario_id": 7,
+      "nome": "Pedro Henrique",
+      "telefone": "83994099696",
+      "numero_titulo": "00123",
+      "data_compra": "2026-03-01T10:00:00Z"
+    }
+  ],
+  "total": 1
+}
+```
+
+---
+
+### 13. Definir Ganhador da Campanha
+
+**`POST /api/campanhas/{campanha_id}/ganhador`** — 🔒 Admin
+
+```json
+// Request
+{
+  "compra_id": 45,
+  "titulo_id": 1230
 }
 
-// 403 Forbidden
+// Response 200
 {
-  "erro": "Acesso negado"
+  "mensagem": "Ganhador definido com sucesso",
+  "ganhador": {
+    "nome": "Pedro Henrique",
+    "campanha": "iPhone 15 Pro Max"
+  }
+}
+```
+
+> Define `status = 'concluido'`, `data_conclusao = hoje`, `numero_sorteado` e marca o título como ganhador.
+
+---
+
+## 🏆 Títulos Premiados
+
+### 14. Listar Títulos Premiados
+
+**`GET /api/campanhas/{slug}/titulos-premiados`** — Público
+
+```json
+// Response 200
+{
+  "titulos_premiados": [
+    {
+      "id": 1,
+      "numero_titulo": "011111",
+      "valor_premio": 500.00,
+      "status": "disponivel",
+      "ganhador_nome": null,
+      "dono": {
+        "compra_id": 45,
+        "titulo_id": 1230,
+        "usuario_id": 7,
+        "nome": "Pedro Henrique",
+        "telefone": "83994099696"
+      }
+    },
+    {
+      "id": 2,
+      "numero_titulo": "099999",
+      "valor_premio": 300.00,
+      "status": "disponivel",
+      "ganhador_nome": null,
+      "dono": null
+    }
+  ],
+  "total": 2,
+  "ganhos": 0,
+  "disponiveis": 2
+}
+```
+
+> **Novidade v2:** Campo `dono` identifica **automaticamente** quem possui o número do título premiado via busca na tabela de compras aprovadas. Se `dono = null`, nenhuma compra aprovada possui aquele número.
+
+---
+
+### 15. Adicionar Título Premiado
+
+**`POST /api/campanhas/{campanha_id}/titulos-premiados`** — 🔒 Admin
+
+```json
+// Request
+{
+  "numero_titulo": "011111",
+  "valor_premio": 500.00
 }
 
-// 404 Not Found
+// Response 201
 {
-  "erro": "Campanha não encontrada"
+  "mensagem": "Título premiado adicionado",
+  "titulo": {
+    "id": 1,
+    "numero_titulo": "011111",
+    "valor_premio": 500.00,
+    "status": "disponivel"
+  }
 }
+```
+
+---
+
+### 16. Remover Título Premiado
+
+**`DELETE /api/campanhas/titulos-premiados/{titulo_id}`** — 🔒 Admin
+
+```json
+// Response 200
+{ "mensagem": "Título premiado removido" }
 ```
 
 ---
 
 ## 💳 Checkout e Pagamentos
 
-> **Novidade:** Sistema completo de checkout e processamento de pagamentos
+### 17. Criar Checkout
 
-### 12. Criar Checkout
-
-**Endpoint:** `POST /api/checkout`  
-**Autenticação:** ✅ Requerida  
-**Descrição:** Cria uma compra, gera os títulos e inicia o processo de pagamento
-
-#### Request Headers
-
-```
-Authorization: Bearer {token}
-Content-Type: application/json
-```
-
-#### Request Body
+**`POST /api/checkout`** — 🔒 Requer auth
 
 ```json
+// Request
 {
   "campanha_id": 1,
   "quantidade_titulos": 10,
   "metodo_pagamento": "pix"
 }
-```
 
-**Campos obrigatórios:**
-- `campanha_id` (integer)
-- `quantidade_titulos` (integer)
-
-**Campos opcionais:**
-- `metodo_pagamento` (string) - Padrão: `pix`. **Apenas PIX é aceito**
-
-#### Response (201 Created)
-
-```json
+// Response 201
 {
   "mensagem": "Checkout criado com sucesso",
   "compra_id": 1,
+  "public_id": "uuid-da-compra",
   "status_pagamento": "pendente",
   "valor_total": 100.00,
   "metodo_pagamento": "pix",
   "pagamento": {
     "tipo": "pix",
-    "qr_code": "00020101021226870014br.gov.bcb.pix2565pix.abacatepay.com/api/v1/qr-pix/payment/...",
-    "qr_code_base64": "data:image/png;base64,iVBORw0K...",
-    "copia_cola": "00020101021226870014br.gov.bcb.pix2565pix.abacatepay.com/api/v1/qr-pix/payment/...",
-    "payment_id": "bill_abc123456",
-    "expira_em": "2026-01-20T12:00:00",
-    "instrucoes": "Pague com PIX - Processamento instantâneo via AbacatePay"
+    "qr_code": "00020101...",
+    "qr_code_base64": "data:image/png;base64,iVBOR...",
+    "copia_cola": "00020101...",
+    "payment_id": "bill_abc123",
+    "expira_em": "2026-03-04T12:10:00",
+    "instrucoes": "Pague com PIX via AbacatePay"
   },
   "compra": {
     "id": 1,
-    "campanha": {
-      "id": 1,
-      "titulo": "iPhone 15 Pro Max",
-      "slug": "iphone-15-pro-max"
-    },
+    "campanha": { "id": 1, "titulo": "iPhone 15 Pro Max", "slug": "iphone-15-pro-max" },
     "quantidade_titulos": 10,
     "valor_total": 100.00,
     "status_pagamento": "pendente",
-    "metodo_pagamento": "pix",
     "titulos": [
-      {
-        "id": 1,
-        "numero": "000123",
-        "is_ganhador": false
-      }
-      // ... mais títulos
+      { "id": 1, "numero": "000123", "is_ganhador": false }
     ]
   }
 }
 ```
 
-> 💡 **Nota Importante:** O sistema utiliza a **AbacatePay** para gerar os QR Codes reais. Em ambiente de desenvolvimento (sem chave configurada), retornará dados mockados para teste.
->
-> ⚠️ **Apenas PIX:** O sistema aceita exclusivamente pagamentos via PIX. Outros métodos retornarão erro.
+> **Gateway:** AbacatePay (PIX). Em dev sem chave configurada retorna dados mock.
 
-#### Possíveis Erros
+**Erros comuns:**
 
-```json
-// 400 Bad Request - Dados faltando na requisição
-{
-  "erro": "campanha_id e quantidade_titulos são obrigatórios"
-}
-
-// 400 Bad Request - Perfil Incompleto (Fintech Rules)
-{
-  "erro": "Complete seu perfil para realizar o pagamento: E-mail válido obrigatório, CPF obrigatório (11 dígitos)",
-  "categoria": "perfil_incompleto"
-}
-
-// 404 Not Found
-{
-  "erro": "Campanha não encontrada"
-}
-
-// 400 Bad Request
-{
-  "erro": "Campanha não está ativa"
-}
-
-// 400 Bad Request
-{
-  "erro": "Quantidade indisponível. Esta campanha tem 5 título(s) disponível(is).",
-  "titulos_disponiveis": 5
-}
-```
+| Código | Mensagem |
+|--------|----------|
+| 400 | `campanha_id e quantidade_titulos são obrigatórios` |
+| 400 | `Complete seu perfil para realizar o pagamento` |
+| 400 | `Campanha não está ativa` |
+| 400 | `Quantidade indisponível. X título(s) disponível(is)` |
+| 400 | `Quantidade mínima de compra: N títulos` |
 
 ---
 
-### 13. Consultar Pagamento
+### 18. Consultar Status de Pagamento
 
-**Endpoint:** `GET /api/pagamentos/{compra_id}`  
-**Autenticação:** ✅ Requerida  
-**Descrição:** Consulta o status de um pagamento específico
-
-#### Request Headers
-
-```
-Authorization: Bearer {token}
-```
-
-#### Response (200 OK)
+**`GET /api/pagamentos/{compra_id}`** — 🔒 Requer auth  
+Aceita `public_id` (UUID) ou `id` interno.
 
 ```json
+// Response 200
 {
   "compra_id": 1,
   "status_pagamento": "aprovado",
   "metodo_pagamento": "pix",
   "valor_total": 100.00,
-  "data_pagamento": "2026-01-19T12:30:00",
-  "criado_em": "2026-01-19T12:00:00"
-}
-```
-
-**Status possíveis:**
-- `pendente` - Aguardando pagamento
-- `aprovado` - Pagamento confirmado
-- `cancelado` - Pagamento cancelado
-- `recusado` - Pagamento recusado
-
-#### Possíveis Erros
-
-```json
-// 404 Not Found
-{
-  "erro": "Compra não encontrada"
-}
-```
-
----
-
-### 14. Webhook de Pagamento
-
-**Endpoint:** `POST /api/pagamentos/webhook`  
-**Autenticação:** Validação de assinatura HMAC no header `X-Webhook-Signature`  
-**Descrição:** Recebe notificações de confirmação de pagamento da AbacatePay (evento `billing.paid`)
-
-> ⚠️ **IMPORTANTE:** Este endpoint valida a assinatura enviada no header `X-Webhook-Signature` usando a chave secreta configurada (`ABACATEPAY_WEBHOOK_SECRET`).
-
-#### Query Parameters
-
-| Parâmetro | Tipo | Descrição |
-|-----------|------|-----------|
-| `gateway` | string | Nome do gateway (padrão: `abacatepay`) |
-
-#### Request Body (Exemplo AbacatePay)
-
-```json
-{
-  "event": "billing.paid",
-  "data": {
-    "billing": {
-      "id": "bill_abc123456",
-      "status": "PAID",
-      "products": [
-        {
-          "externalId": "123", // ID da Compra
-          "name": "Rifas - Compra #123"
-        }
-      ]
-    }
+  "quantidade_titulos": 10,
+  "data_pagamento": "2026-03-04T12:05:00",
+  "criado_em": "2026-03-04T12:00:00",
+  "expira_em": "2026-03-04T12:10:00",
+  "campanha": {
+    "titulo": "iPhone 15 Pro Max",
+    "slug": "iphone-15-pro-max",
+    "valor_titulo": 10.00
   }
 }
 ```
 
-#### Response (200 OK)
+**Status:** `pendente` → `aprovado` | `cancelado` | `recusado` | `expirado`
+
+---
+
+### 19. Webhook de Pagamento
+
+**`POST /api/pagamentos/webhook`** — Validação HMAC
+
+Header: `X-Webhook-Signature: {assinatura_hmac}`
 
 ```json
+// Request (AbacatePay)
+{
+  "event": "billing.paid",
+  "data": {
+    "billing": {
+      "id": "bill_abc123",
+      "status": "PAID",
+      "products": [{ "externalId": "1" }]
+    }
+  }
+}
+
+// Response 200
 {
   "mensagem": "Webhook processado com sucesso",
-  "compra_id": 123,
+  "compra_id": 1,
   "status_anterior": "pendente",
   "status_atual": "aprovado",
   "gateway": "abacatepay"
 }
 ```
 
-> 📝 **Nota:** Quando o status é alterado para `aprovado`, o sistema automaticamente:
-> - Atualiza `data_pagamento` para o momento atual
-> - Incrementa `titulos_vendidos` da campanha
-> - Gera os títulos comprados
-> - Torna os títulos visíveis em `/api/meus-titulos`
-
-#### Possíveis Erros
-
-```json
-// 400 Bad Request
-{
-  "erro": "compra_id é obrigatório"
-}
-
-// 400 Bad Request
-{
-  "erro": "Status inválido: xyz"
-}
-
-// 404 Not Found
-{
-  "erro": "Compra não encontrada"
-}
-```
+> Ao aprovar: atualiza `data_pagamento`, incrementa `titulos_vendidos`, gera os títulos da compra.
 
 ---
 
-### 15. Aprovar Pagamento Manualmente
+## 📋 Compras e Títulos
 
-**Endpoint:** `POST /api/pagamentos/{compra_id}/aprovar`  
-**Autenticação:** ✅ Requerida (Admin)  
-**Descrição:** Aprova um pagamento manualmente (apenas administradores)
+### 20. Meus Títulos
 
-> 💡 **Uso:** Útil para pagamentos offline, testes, ou quando há problemas com o webhook do gateway
+**`GET /api/meus-titulos`** — 🔒 Requer auth
 
-#### Request Headers
-
-```
-Authorization: Bearer {token}
-```
-
-#### Response (200 OK)
+| Parâmetro | Tipo | Descrição |
+|-----------|------|-----------|
+| `page` | integer | Página |
+| `per_page` | integer | Itens por página |
 
 ```json
-{
-  "mensagem": "Pagamento aprovado manualmente",
-  "compra_id": 1,
-  "status_anterior": "pendente",
-  "status_atual": "aprovado",
-  "aprovado_por": "Admin Name"
-}
-```
-
-#### Possíveis Erros
-
-```json
-// 403 Forbidden
-{
-  "erro": "Acesso negado"
-}
-
-// 404 Not Found
-{
-  "erro": "Compra não encontrada"
-}
-```
-
----
-
-## 🛒 Compras e Títulos
-
-### 16. Criar Compra
-
-**Endpoint:** `POST /api/compras`  
-**Autenticação:** ✅ Requerida  
-**Descrição:** Cria uma nova compra de títulos
-
-#### Request Headers
-
-```
-Authorization: Bearer {token}
-Content-Type: application/json
-```
-
-#### Request Body
-
-```json
-{
-  "campanha_id": 1,
-  "quantidade_titulos": 10,
-  "metodo_pagamento": "pix"
-}
-```
-
-**Campos obrigatórios:**
-- `campanha_id` (integer)
-- `quantidade_titulos` (integer)
-
-**Campos opcionais:**
-- `metodo_pagamento` (string) - Padrão: `pix`. Valores: `pix`, `cartao`, `boleto`
-
-#### Response (201 Created)
-
-```json
-{
-  "mensagem": "Compra realizada com sucesso",
-  "compra": {
-    "id": 1,
-    "campanha": {
-      "id": 1,
-      "titulo": "iPhone 15 Pro Max",
-      "slug": "iphone-15-pro-max",
-      // ... demais campos da campanha
-    },
-    "quantidade_titulos": 10,
-    "valor_total": 100.00,
-    "status_pagamento": "pendente",
-    "metodo_pagamento": "pix",
-    "data_pagamento": null,
-    "criado_em": "2026-01-03T00:00:00",
-    "titulos": [
-      {
-        "id": 1,
-        "numero": "123456",
-        "is_ganhador": false
-      },
-      {
-        "id": 2,
-        "numero": "789012",
-        "is_ganhador": false
-      }
-      // ... mais 8 títulos
-    ]
-  }
-}
-```
-
-#### Possíveis Erros
-
-```json
-// 404 Not Found
-{
-  "erro": "Campanha não encontrada"
-}
-
-// 400 Bad Request
-{
-  "erro": "Campanha não está ativa"
-}
-
-// 400 Bad Request
-{
-  "erro": "Quantidade de títulos indisponível"
-}
-```
-
----
-
-### 13. Meus Títulos
-
-**Endpoint:** `GET /api/meus-titulos`  
-**Autenticação:** ✅ Requerida  
-**Descrição:** Lista todos os títulos comprados pelo usuário autenticado
-
-#### Query Parameters
-
-| Parâmetro | Tipo | Padrão | Descrição |
-|-----------|------|--------|-----------|
-| `page` | integer | `1` | Número da página |
-| `per_page` | integer | `20` | Itens por página |
-
-#### Request Headers
-
-```
-Authorization: Bearer {token}
-```
-
-#### Exemplo de Request
-
-```
-GET /api/meus-titulos?page=1&per_page=10
-```
-
-#### Response (200 OK)
-
-```json
+// Response 200
 {
   "compras": [
     {
@@ -968,306 +607,109 @@ GET /api/meus-titulos?page=1&per_page=10
         "id": 1,
         "titulo": "iPhone 15 Pro Max",
         "slug": "iphone-15-pro-max",
-        "imagem_principal": "https://exemplo.com/iphone.jpg",
-        "valor_titulo": 10.00,
-        "data_sorteio": "2026-02-01T20:00:00",
+        "imagem_principal": "https://...",
         "status": "ativo"
       },
       "quantidade_titulos": 10,
       "valor_total": 100.00,
       "status_pagamento": "aprovado",
       "metodo_pagamento": "pix",
-      "data_pagamento": "2026-01-03T00:15:00",
-      "criado_em": "2026-01-03T00:00:00",
+      "criado_em": "2026-03-04T12:00:00Z",
       "titulos": [
-        {
-          "id": 1,
-          "numero": "123456",
-          "is_ganhador": false
-        },
-        {
-          "id": 2,
-          "numero": "789012",
-          "is_ganhador": false
-        }
-        // ... demais títulos
+        { "id": 1, "numero": "000123", "is_ganhador": false }
       ]
     }
   ],
-  "total": 3,
+  "total": 1,
   "paginas": 1,
   "pagina_atual": 1
 }
 ```
 
-> 📝 **Nota:** Apenas retorna compras com `status_pagamento: "aprovado"`
+> **Ordenação:** Pendentes → Aprovadas → Expiradas.
 
 ---
 
-### 14. Deletar Compra
+## 🏅 Ganhadores
 
-**Endpoint:** `DELETE /api/compras/{compra_id}`  
-**Autenticação:** ✅ Requerida (Admin)  
-**Descrição:** Deleta uma compra e seus títulos associados (apenas admin)
+### 21. Listar Ganhadores
 
-#### Request Headers
-
-```
-Authorization: Bearer {token}
-```
-
-#### Response (200 OK)
-
-```json
-{
-  "mensagem": "Compra deletada com sucesso"
-}
-```
-
-#### Possíveis Erros
-
-```json
-// 400 Bad Request - Campanha já concluída
-{
-  "erro": "Não é possível deletar compra de campanha já concluída"
-}
-
-// 403 Forbidden
-{
-  "erro": "Acesso negado"
-}
-
-// 404 Not Found
-{
-  "erro": "Compra não encontrada"
-}
-```
-
----
-
-## 🏆 Ganhadores
-
-### 15. Listar Ganhadores
-
-**Endpoint:** `GET /api/ganhadores`  
-**Autenticação:** Não requerida  
-**Descrição:** Lista os ganhadores de campanhas concluídas
-
-#### Query Parameters
+**`GET /api/ganhadores`** — Público
 
 | Parâmetro | Tipo | Padrão | Descrição |
 |-----------|------|--------|-----------|
-| `page` | integer | `1` | Número da página |
+| `limit` | integer | `10` | Máximo de registros |
+| `page` | integer | `1` | Página |
 | `per_page` | integer | `20` | Itens por página |
 
-#### Exemplo de Request
-
-```
-GET /api/ganhadores?page=1&per_page=10
-```
-
-#### Response (200 OK)
-
 ```json
+// Response 200
 {
   "ganhadores": [
     {
-      "id": 5,
-      "titulo": "iPhone 15 Pro Max",
-      "slug": "iphone-15-pro-max-jan",
-      "premio": "iPhone 15 Pro Max 256GB",
-      "data_sorteio": "2026-01-15T20:00:00",
-      "status": "concluido",
-      "numero_sorteado": "123456",
-      "ganhador": {
-        "nome": "João Silva",
-        "cidade": "São Paulo",
-        "estado": "SP"
-      }
+      "id": "uuid-da-campanha",
+      "name": "Pedro H***",
+      "campaignTitle": "iPhone 15 Pro Max",
+      "prize": "iPhone 15 Pro Max 256GB",
+      "luckyNumber": "00123",
+      "drawDate": "15/03/2026",
+      "phone": "(**) *****-1234"
     }
   ],
-  "total": 25,
-  "paginas": 3
+  "total": 5,
+  "paginas": 1
 }
 ```
 
+> Todos os dados pessoais são **mascarados** automaticamente.
+
 ---
 
-## 👨‍💼 Admin
+## 🛠 Admin
 
-### 16. Listar Usuários (Admin)
+### 22. Listar Usuários
 
-**Endpoint:** `GET /api/admin/usuarios`  
-**Autenticação:** ✅ Requerida (Admin)  
-**Descrição:** Lista todos os usuários cadastrados (apenas administradores)
+**`GET /api/painel-secreto-x9/usuarios`** — 🔒 Admin  
+*(Prefixo configurável via `ADMIN_ROUTE_SECRET`)*
 
-#### Query Parameters
-
-| Parâmetro | Tipo | Padrão | Descrição |
-|-----------|------|--------|----------- |
-| `page` | integer | `1` | Número da página |
-| `per_page` | integer | `20` | Itens por página |
-
-#### Request Headers
-
-```
-Authorization: Bearer {token}
-```
-
-#### Response (200 OK)
+| Parâmetro | Tipo | Descrição |
+|-----------|------|-----------|
+| `page` | integer | Página |
+| `per_page` | integer | Itens por página |
 
 ```json
+// Response 200
 {
   "usuarios": [
     {
       "id": 1,
       "nome": "João Silva",
-      "email": "joao@email.com",
-      "telefone": "11999999999",
+      "telefone": "(**) *****-9999",
+      "email": "jo***@email.com",
+      "cpf": "123.***.***-**",
       "is_admin": false,
-      "criado_em": "2026-01-01T00:00:00"
-    },
-    {
-      "id": 2,
-      "nome": "Admin User",
-      "email": "admin@gemeos.com",
-      "telefone": "5583994099696",
-      "is_admin": true,
-      "criado_em": "2025-12-01T00:00:00"
+      "criado_em": "2026-03-04T00:00:00"
     }
   ],
-  "total": 150,
-  "paginas": 8,
-  "pagina_atual": 1
-}
-```
-
-#### Possíveis Erros
-
-```json
-// 403 Forbidden
-{
-  "erro": "Acesso negado. Apenas administradores."
+  "total": 100,
+  "paginas": 5
 }
 ```
 
 ---
 
-### 17. Dashboard Administrativo
+### 23. Dashboard Admin
 
-**Endpoint:** `GET /api/admin/dashboard`  
-**Autenticação:** ✅ Requerida (Admin)  
-**Descrição:** Retorna estatísticas gerais do sistema (apenas administradores)
-
-#### Request Headers
-
-```
-Authorization: Bearer {token}
-```
-
-#### Response (200 OK)
+**`GET /api/painel-secreto-x9/dashboard`** — 🔒 Admin
 
 ```json
+// Response 200
 {
-  "stats": {
-    "total_usuarios": 150,
-    "total_campanhas": 25,
-    "campanhas_ativas": 8,
-    "receita_total": 45890.50
-  },
-  "ultimas_vendas": [
-    {
-      "id": 127,
-      "campanha": "iPhone 15 Pro Max",
-      "usuario": "João Silva",
-      "valor": 100.00,
-      "data": "2026-01-11T14:30:00"
-    },
-    {
-      "id": 126,
-      "campanha": "Notebook Gamer",
-      "usuario": "Maria Santos",
-      "valor": 50.00,
-      "data": "2026-01-11T13:15:00"
-    }
-  ]
-}
-```
-
-#### Possíveis Erros
-
-```json
-// 403 Forbidden
-{
-  "erro": "Acesso negado. Apenas administradores."
-}
-```
-
----
-
-## 📰 Artigos
-
-### 18. Listar Artigos
-
-**Endpoint:** `GET /api/artigos`  
-**Autenticação:** Não requerida  
-**Descrição:** Lista artigos publicados
-
-#### Query Parameters
-
-| Parâmetro | Tipo | Padrão | Descrição |
-|-----------|------|--------|-----------|
-| `page` | integer | `1` | Número da página |
-| `per_page` | integer | `10` | Itens por página |
-
-#### Response (200 OK)
-
-```json
-{
-  "artigos": [
-    {
-      "id": 1,
-      "titulo": "Como funcionam os sorteios?",
-      "slug": "como-funcionam-os-sorteios",
-      "conteudo": "Os sorteios são realizados...",
-      "imagem": "https://exemplo.com/artigo1.jpg",
-      "autor": "Equipe Gêmeos Brasil",
-      "criado_em": "2026-01-01T00:00:00"
-    }
-  ],
-  "total": 15,
-  "paginas": 2
-}
-```
-
----
-
-### 19. Detalhes do Artigo
-
-**Endpoint:** `GET /api/artigos/{slug}`  
-**Autenticação:** Não requerida  
-**Descrição:** Obtém detalhes completos de um artigo
-
-#### Response (200 OK)
-
-```json
-{
-  "id": 1,
-  "titulo": "Como funcionam os sorteios?",
-  "slug": "como-funcionam-os-sorteios",
-  "conteudo": "Os sorteios são realizados de forma totalmente transparente...",
-  "imagem": "https://exemplo.com/artigo1.jpg",
-  "autor": "Equipe Gêmeos Brasil",
-  "criado_em": "2026-01-01T00:00:00"
-}
-```
-
-#### Possíveis Erros
-
-```json
-// 404 Not Found
-{
-  "erro": "Artigo não encontrado"
+  "campanhas_ativas": 3,
+  "campanhas_concluidas": 5,
+  "total_usuarios": 150,
+  "total_compras_aprovadas": 320,
+  "receita_total": 9800.00
 }
 ```
 
@@ -1275,297 +717,135 @@ Authorization: Bearer {token}
 
 ## 📢 Comunicados
 
-### 20. Listar Comunicados
+### 24. Listar Comunicados
 
-**Endpoint:** `GET /api/comunicados`  
-**Autenticação:** Não requerida  
-**Descrição:** Lista comunicados ativos (últimos 10)
-
-#### Response (200 OK)
+**`GET /api/comunicados`** — Público
 
 ```json
+// Response 200
 {
   "comunicados": [
     {
       "id": 1,
-      "titulo": "Manutenção programada",
-      "conteudo": "Sistema ficará fora do ar...",
-      "tipo": "alerta",
-      "criado_em": "2026-01-03T00:00:00"
+      "titulo": "Manutenção Programada",
+      "conteudo": "O sistema estará em manutenção...",
+      "tipo": "aviso",
+      "ativo": true,
+      "criado_em": "2026-03-04T00:00:00"
     }
   ]
 }
 ```
 
-**Tipos de comunicado:**
-- `informativo` - Informação geral
-- `alerta` - Atenção necessária
-- `aviso` - Avisos importantes
+**Tipos:** `informativo`, `alerta`, `aviso`
 
 ---
 
-## 📧 Contato
+### 25. Criar Comunicado
 
-### 21. Enviar Contato
-
-**Endpoint:** `POST /api/contato`  
-**Autenticação:** Não requerida  
-**Descrição:** Envia uma mensagem de contato
-
-#### Request Body
+**`POST /api/comunicados`** — 🔒 Admin
 
 ```json
+// Request
 {
-  "nome": "Maria Santos",
-  "email": "maria@email.com",
-  "telefone": "11988888888",
-  "assunto": "Dúvida sobre sorteio",
-  "mensagem": "Gostaria de saber quando será o próximo sorteio..."
+  "titulo": "Novo Sorteio",
+  "conteudo": "Participem do novo sorteio...",
+  "tipo": "informativo"
 }
+// Response 201
+{ "mensagem": "Comunicado criado", "comunicado": { ... } }
 ```
 
-**Campos obrigatórios:**
-- `nome` (string)
-- `email` (string)
-- `mensagem` (string)
+---
 
-**Campos opcionais:**
-- `telefone` (string)
-- `assunto` (string)
+### 26. Atualizar Comunicado
 
-#### Response (201 Created)
+**`PUT /api/comunicados/{id}`** — 🔒 Admin
 
 ```json
-{
-  "mensagem": "Mensagem enviada com sucesso"
-}
+// Request (todos opcionais)
+{ "titulo": "...", "conteudo": "...", "tipo": "alerta", "ativo": false }
+// Response 200
+{ "mensagem": "Comunicado atualizado", "comunicado": { ... } }
 ```
 
-#### Possíveis Erros
+---
+
+### 27. Excluir Comunicado
+
+**`DELETE /api/comunicados/{id}`** — 🔒 Admin
 
 ```json
-// 400 Bad Request
+// Response 200
+{ "mensagem": "Comunicado excluído" }
+```
+
+---
+
+## 📬 Contato
+
+### 28. Enviar Mensagem de Contato
+
+**`POST /api/contato`** — Público
+
+```json
+// Request
 {
-  "erro": "Nome, email e mensagem são obrigatórios"
+  "nome": "João Silva",
+  "email": "joao@email.com",
+  "mensagem": "Tenho uma dúvida sobre..."
 }
+// Response 200
+{ "mensagem": "Mensagem enviada com sucesso" }
 ```
 
 ---
 
-## 📌 Códigos de Status
+## 🚀 Deploy Railway
 
-| Código | Descrição |
-|--------|-----------|
-| 200 | OK - Requisição bem-sucedida |
-| 201 | Created - Recurso criado com sucesso |
-| 400 | Bad Request - Dados inválidos ou faltando |
-| 401 | Unauthorized - Token inválido ou ausente |
-| 403 | Forbidden - Sem permissão para acessar |
-| 404 | Not Found - Recurso não encontrado |
-| 500 | Internal Server Error - Erro no servidor |
+### Variáveis de Ambiente Obrigatórias
 
----
+| Variável | Descrição |
+|----------|-----------|
+| `DATABASE_URL` | Gerado automaticamente pelo plugin PostgreSQL |
+| `FLASK_ENV` | `production` |
+| `SECRET_KEY` | Chave secreta Flask (mín. 32 chars) |
+| `JWT_SECRET_KEY` | Chave JWT (mín. 32 chars) |
+| `CORS_ORIGINS` | URLs do frontend separadas por vírgula |
+| `BASE_URL` | URL do backend no Railway |
+| `ABACATEPAY_API_KEY` | Chave de produção AbacatePay |
+| `ABACATEPAY_WEBHOOK_SECRET` | Secret do webhook AbacatePay |
 
-## 🔧 Tipos de Dados
-
-### DateTime Format
-
-Todas as datas seguem o formato ISO 8601:
-
-```
-2026-01-03T00:00:00
-```
-
-### Status de Pagamento
-
-- `pendente` - Aguardando pagamento
-- `aprovado` - Pagamento confirmado
-- `cancelado` - Pagamento cancelado
-
-### Status de Campanha
-
-- `ativo` - Campanha em andamento
-- `concluido` - Campanha finalizada
-- `cancelado` - Campanha cancelada
-
-### Métodos de Pagamento
-
-- `pix` - Pagamento via PIX
-- `cartao` - Cartão de crédito
-- `boleto` - Boleto bancário
-
----
-
-## 🔒 Segurança e Boas Práticas
-
-### Headers Recomendados
-
-```http
-Content-Type: application/json
-Accept: application/json
-Authorization: Bearer {token}
-```
-
-### Armazenamento do Token
-
-- Armazene o token JWT de forma segura (localStorage ou sessionStorage)
-- Inclua em todas as requisições autenticadas
-- Token expira em 7 dias
-
-### Tratamento de Erros
-
-Sempre verifique o status code e trate os erros adequadamente:
-
-```javascript
-const response = await fetch('/api/auth/login', {
-  method: 'POST',
-  headers: {
-    'Content-Type': 'application/json'
-  },
-  body: JSON.stringify({ telefone, senha })
-});
-
-const data = await response.json();
-
-if (response.ok) {
-  // Sucesso
-  localStorage.setItem('token', data.token);
-} else {
-  // Erro
-  alert(data.erro);
-}
-```
-
----
-
-## 📱 Exemplo de Integração (JavaScript/React)
-
-### Configuração do Axios
-
-```javascript
-import axios from 'axios';
-
-const api = axios.create({
-  baseURL: 'http://localhost:5000/api',
-  headers: {
-    'Content-Type': 'application/json'
-  }
-});
-
-// Interceptor para adicionar token
-api.interceptors.request.use(config => {
-  const token = localStorage.getItem('token');
-  if (token) {
-    config.headers.Authorization = `Bearer ${token}`;
-  }
-  return config;
-});
-
-export default api;
-```
-
-### Exemplos de Uso
-
-```javascript
-// Login
-const login = async (telefone, senha) => {
-  const response = await api.post('/auth/login', { telefone, senha });
-  localStorage.setItem('token', response.data.token);
-  return response.data.usuario;
-};
-
-// Listar campanhas
-const getCampanhas = async (status = 'ativo', page = 1) => {
-  const response = await api.get('/campanhas', {
-    params: { status, page }
-  });
-  return response.data;
-};
-
-// Criar compra
-const criarCompra = async (campanhaId, quantidade) => {
-  const response = await api.post('/compras', {
-    campanha_id: campanhaId,
-    quantidade_titulos: quantidade,
-    metodo_pagamento: 'pix'
-  });
-  return response.data;
-};
-
-// Meus títulos
-const getMeusTitulos = async (page = 1) => {
-  const response = await api.get('/meus-titulos', {
-    params: { page }
-  });
-  return response.data;
-};
-```
-
----
-
-## 🚀 Testando a API
-
-### Com cURL
+### Geração de Chaves Seguras
 
 ```bash
-# Login
-curl -X POST http://localhost:5000/api/auth/login \
-  -H "Content-Type: application/json" \
-  -d '{"telefone":"11999999999","senha":"senha123"}'
-
-# Listar campanhas
-curl http://localhost:5000/api/campanhas?status=ativo
-
-# Meus títulos (com autenticação)
-curl http://localhost:5000/api/meus-titulos \
-  -H "Authorization: Bearer SEU_TOKEN_AQUI"
+python -c "import secrets; print(secrets.token_hex(32))"
 ```
 
-### Com Postman
-
-1. Importe a collection (pode criar baseada nesta documentação)
-2. Configure variável de ambiente `baseUrl` como `http://localhost:5000`
-3. Configure variável `token` após fazer login
-4. Use `{{baseUrl}}` e `{{token}}` nas requisições
+> **DATABASE_URL:** O Railway fornece com prefixo `postgres://` — o sistema corrige automaticamente para `postgresql://` (compatível com SQLAlchemy).
 
 ---
 
-## 📞 Suporte
+## 📊 Códigos de Status
 
-Para dúvidas ou problemas com a integração:
-
-- **Email:** suporte@gemeosbrasil.com
-- **Documentação completa:** [README.md](file:///c:/Projetos/Projeto-rifa/README.md)
-
----
-
-**Última atualização:** 2026-02-14  
-**Versão da API:** 1.2 (Security Update)  
-**Changelog:**
-- ✅ **Segurança**: Public IDs (UUID) em todas as rotas públicas
-- ✅ **Segurança**: Rate Limiting (Login: 5/min, Geral: 100/min)
-- ✅ **Segurança**: Webhook Signature Validation (AbacatePay)
-- ✅ **Auth**: Recuperação de Senha (Forgot/Reset Password)
-- ✅ **Admin**: Rota de Admin Ofuscada (Security Header) e Audit Logs
+| Código | Significado |
+|--------|-------------|
+| `200` | OK |
+| `201` | Criado com sucesso |
+| `400` | Requisição inválida |
+| `401` | Não autenticado |
+| `403` | Sem permissão (admin requerido) |
+| `404` | Recurso não encontrado |
+| `429` | Too Many Requests (rate limiting) |
+| `500` | Erro interno do servidor |
 
 ---
 
-## 🛡️ Testando Segurança
+## 🔒 Segurança
 
-### 1. Rate Limiting
-Tente fazer login mais de 5 vezes em 1 minuto.
-- **Esperado**: HTTP 429 Too Many Requests
-- **Body**: `{ "message": "5 per minute" }`
-
-### 2. Recuperação de Senha
-- **POST** `/api/auth/forgot-password` com email válido.
-- **Observer**: O token será exibido no console do backend (Ambiente DEV).
-- **POST** `/api/auth/reset-password` com o token e nova senha.
-
-### 3. Webhook AbacatePay
-- Em produção, é obrigatório configurar `ABACATEPAY_WEBHOOK_SECRET`.
-- Requests sem o header `X-Webhook-Signature` correto serão rejeitados com 401.
-
-### 4. Admin Obfuscation
-- A rota `/api/admin` não deve ser acessível diretamente ou deve retornar 404 se não configurada corretamente.
-- A rota real é definida por `ADMIN_ROUTE_SECRET` (Ex: `/api/painel-secreto-x9`).
+- **UUIDs públicos:** Campanhas e compras expõem `public_id` (UUID) em vez de IDs internos
+- **Mascaramento:** CPF, email e telefone são mascarados nas respostas
+- **Rate Limiting:** Endpoints críticos têm limite de requisições
+- **Rota Admin Ofuscada:** Prefixo configurável via `ADMIN_ROUTE_SECRET`
+- **HMAC Webhook:** Assinatura validada em todos os webhooks de pagamento
+- **JWT:** Tokens expiram em 7 dias

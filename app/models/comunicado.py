@@ -23,5 +23,6 @@ class Comunicado(db.Model):
             'titulo': self.titulo,
             'conteudo': self.conteudo,
             'tipo': self.tipo,
+            'ativo': self.ativo,
             'criado_em': self.criado_em.isoformat()
         }

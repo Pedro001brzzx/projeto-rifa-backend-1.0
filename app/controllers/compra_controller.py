@@ -6,6 +6,7 @@ Contém a lógica de negócio para compras e geração de títulos
 import random
 import requests
 import os
+import uuid
 from app.models import db, Campanha, Compra, Titulo
 
 # Constante: Número máximo de títulos únicos possíveis
@@ -28,7 +29,14 @@ def criar_compra(usuario_id, data):
     Returns:
         tuple: (response dict, status code)
     """
-    campanha = Campanha.query.get(data['campanha_id'])
+    # FIX: Frontend envia public_id (UUID), não o ID interno (int)
+    # Segurança: Garantir que usuario_id é inteiro
+    try:
+        usuario_id = int(usuario_id)
+    except (ValueError, TypeError):
+        return {'erro': 'ID de usuário inválido'}, 400
+
+    campanha = Campanha.query.filter_by(public_id=data['campanha_id']).first()
     if not campanha:
         return {'erro': 'Campanha não encontrada'}, 404
     
@@ -65,6 +73,7 @@ def criar_compra(usuario_id, data):
     compra = Compra(
         usuario_id=int(usuario_id),
         campanha_id=campanha.id,
+        public_id=str(uuid.uuid4()), # GERAÇÃO DE ID PÚBLICO (UUID)
         quantidade_titulos=quantidade,
         valor_total=valor_total,
         metodo_pagamento=data.get('metodo_pagamento', 'pix')
@@ -90,31 +99,10 @@ def criar_compra(usuario_id, data):
     
     print(f"💾 [DEBUG] Compra #{compra.id} criada SEM títulos (aguardando pagamento)")
     
-    # Gerar PIX QR Code se método for PIX
-    dados_pix = None
-    # ⚠️ FIX: NÃO gerar PIX aqui!
-    # O pagamento agora é gerenciado exclusivamente pelo pagamento_controller._gerar_dados_pagamento
-    # if compra.metodo_pagamento == 'pix':
-    #     try:
-    #         dados_pix = criar_pix_qrcode(compra)
-    #         if dados_pix:
-    #             # Salvar dados do PIX no banco para consulta posterior
-    #             compra.pix_copia_cola = dados_pix['pix_copia_cola']
-    #             compra.pix_qr_code_base64 = dados_pix['qrcode_base64']
-    #             compra.transacao_id = dados_pix['pix_id']
-    #             db.session.commit()
-    #             print(f"✅ [DEBUG] PIX gerado e salvo para compra #{compra.id}")
-    #     except Exception as e:
-    #         print(f"❌ [ERRO] Falha ao gerar PIX: {str(e)}")
-    
     response_data = {
         'mensagem': 'Compra realizada com sucesso',
         'compra': compra.to_dict()
     }
-    
-    # Adicionar dados do PIX à resposta
-    if dados_pix:
-        response_data.update(dados_pix)
     
     return response_data, 201
 
@@ -208,6 +196,11 @@ def listar_compras_usuario(usuario_id, page=1, per_page=20):
     from sqlalchemy import case, and_, or_
     from datetime import datetime
     
+    try:
+        usuario_id = int(usuario_id)
+    except (ValueError, TypeError):
+        return {'erro': 'ID de usuário inválido'}, 400
+    
     # Data atual para verificar expiração em tempo real
     now = datetime.utcnow()
     
@@ -253,13 +246,23 @@ def deletar_compra(usuario_id, compra_id):
     """
     from app.models import Usuario
     
+    try:
+        usuario_id = int(usuario_id)
+    except (ValueError, TypeError):
+        return {'erro': 'ID de usuário inválido'}, 400
+    
     # Verificar se usuário é admin
     usuario = Usuario.query.get(int(usuario_id))
     if not usuario or not usuario.is_admin:
         return {'erro': 'Acesso negado'}, 403
     
-    # Buscar compra
-    compra = Compra.query.get(compra_id)
+    # Buscar compra por public_id (UUID)
+    compra = Compra.get_by_public_id(compra_id)
+    if not compra:
+        try:
+            compra = Compra.query.get(int(compra_id))
+        except (ValueError, TypeError):
+            pass
     
     if not compra:
         return {'erro': 'Compra não encontrada'}, 404
@@ -272,10 +275,10 @@ def deletar_compra(usuario_id, compra_id):
         }, 400
     
     # Contar títulos a serem deletados
-    qtd_titulos = Titulo.query.filter_by(compra_id=compra_id).count()
+    qtd_titulos = Titulo.query.filter_by(compra_id=compra.id).count()
     
     # Deletar títulos associados primeiro (cascade)
-    Titulo.query.filter_by(compra_id=compra_id).delete()
+    Titulo.query.filter_by(compra_id=compra.id).delete()
     
     # Deletar compra
     db.session.delete(compra)

@@ -26,7 +26,7 @@ def criar_checkout():
     return jsonify(response), status
 
 
-@pagamento_bp.route('/pagamentos/<int:compra_id>', methods=['GET'])
+@pagamento_bp.route('/pagamentos/<string:compra_id>', methods=['GET'])
 @jwt_required()
 def consultar_pagamento(compra_id):
     """Endpoint para consultar status de pagamento"""
@@ -57,7 +57,7 @@ def processar_webhook():
     return jsonify(response), status
 
 
-@pagamento_bp.route('/pagamentos/<int:compra_id>/aprovar', methods=['POST'])
+@pagamento_bp.route('/pagamentos/<string:compra_id>/aprovar', methods=['POST'])
 @jwt_required()
 @admin_required()
 @with_admin_log("Aprovação Manual de Pagamento")

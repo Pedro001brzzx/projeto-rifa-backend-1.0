@@ -4,27 +4,27 @@ Backend para Sistema de Campanhas/Sorteios
 """
 
 import os
-import sys
 from app import create_app
 from app.models import db
 
-# Criar aplicação
-config_name = os.getenv('FLASK_ENV', 'default')
+# Criar aplicação — usa FLASK_ENV para selecionar config (default: production no Railway)
+config_name = os.getenv('FLASK_ENV', 'production')
 app = create_app(config_name)
 
+# Garantir que as tabelas existam ao iniciar
+with app.app_context():
+    db.create_all()
 
 if __name__ == '__main__':
-    # Criar tabelas do banco de dados em AMBOS os processos (principal e reload)
-    with app.app_context():
-        db.create_all()
-        
-    # Mostrar info apenas no processo principal
+    port = int(os.getenv('PORT', 5000))
+    debug = os.getenv('FLASK_ENV', 'production') == 'development'
+
     if os.environ.get('WERKZEUG_RUN_MAIN') != 'true':
         with app.app_context():
-            print('✅ Tabelas verificadas/criadas')
             db_uri = app.config["SQLALCHEMY_DATABASE_URI"]
-            print(f'📊 Conectado ao banco: {db_uri}')
-    
-    # Executar aplicação
-    print('🚀 Servidor iniciado em http://127.0.0.1:5000')
-    app.run(debug=True)
+            # Ocultar credenciais no log
+            safe_uri = db_uri.split('@')[-1] if '@' in db_uri else db_uri
+            print(f'📊 Banco: ...@{safe_uri}')
+        print(f'🚀 Servidor iniciado em http://0.0.0.0:{port}')
+
+    app.run(debug=debug, host='0.0.0.0', port=port)

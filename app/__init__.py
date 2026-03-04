@@ -34,17 +34,12 @@ def create_app(config_name='default'):
         response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
         return response
 
-    # Configurar CORS para aceitar requisições do frontend (Produção + Dev)
+    # Configurar CORS — origens lidas da config (variável de ambiente CORS_ORIGINS)
+    cors_origins = [o.strip() for o in app.config.get('CORS_ORIGINS', '').split(',') if o.strip()]
     CORS(app, resources={
-        r"/api/*": {
-            "origins": [
-                "http://localhost:3000",
-                "http://localhost:5173",
-                "http://127.0.0.1:3000",
-                "http://127.0.0.1:5173",
-                "https://seudominio.com" # Adicione seu domínio de produção aqui
-            ],
-            "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+        r"/*": {
+            "origins": cors_origins,
+            "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
             "allow_headers": ["Content-Type", "Authorization"],
             "supports_credentials": True
         }

@@ -13,6 +13,7 @@ from app.models.artigo import Artigo
 from app.models.comunicado import Comunicado
 from app.models.contato import Contato
 from app.models.admin_log import AdminLog
+from app.models.titulo_premiado import TituloPremiado
 
 __all__ = [
     'db',
@@ -24,5 +25,6 @@ __all__ = [
     'Artigo',
     'Comunicado',
     'Contato',
-    'AdminLog'
+    'AdminLog',
+    'TituloPremiado'
 ]

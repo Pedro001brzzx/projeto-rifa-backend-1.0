@@ -128,8 +128,18 @@ def criar_checkout(usuario_id, data):
         if status_compra != 201:
             return response_compra, status_compra
 
-        compra_id = response_compra['compra']['id']
-        compra_obj = Compra.query.get(compra_id)
+        compra_id = response_compra['compra']['id'] # This is the public_id (UUID)
+        
+        # FIX: Lookup by public_id using helper method
+        compra_obj = Compra.get_by_public_id(compra_id)
+
+        if not compra_obj:
+             return {'erro': 'Compra não encontrada'}, 404
+             
+        # Blindagem: Verificar status antes de processar
+        if compra_obj.status_pagamento != 'pendente':
+            return {'erro': 'Compra já processada ou inválida'}, 400
+            
         metodo_pagamento = data.get('metodo_pagamento', 'pix')
 
         # Preparar dados de pagamento baseado no método (AbacatePay)
@@ -228,11 +238,12 @@ def _gerar_dados_pagamento(compra, metodo_pagamento, usuario=None):
     if not api_key or api_key == 'sua-api-key-aqui':
         # MODO DESENVOLVIMENTO: Retornar mock se não configurado
         print("⚠️ AVISO: AbacatePay não configurado. Usando dados MOCK.")
+        compra_id_str = str(compra["id"]).replace("-", "")[:32].ljust(32, "0")
         return {
             'tipo': 'pix',
-            'qr_code': f'00020126580014br.gov.bcb.pix0136{compra["id"]:032d}520400005303986540{compra["valor_total"]:.2f}5802BR5925Sistema Rifas6014SAO PAULO62070503***6304XXXX',
+            'qr_code': f'00020126580014br.gov.bcb.pix0136{compra_id_str}520400005303986540{float(compra["valor_total"]):.2f}5802BR5925Sistema Rifas6014SAO PAULO62070503***6304XXXX',
             'qr_code_base64': 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==',
-            'copia_cola': f'00020126580014br.gov.bcb.pix{compra["id"]}',
+            'copia_cola': f'00020126580014br.gov.bcb.pix{compra_id_str}',
             'expira_em': (datetime.utcnow() + timedelta(minutes=10)).isoformat() + 'Z',
             'instrucoes': '⚠️ MODO DESENVOLVIMENTO - Configure ABACATEPAY_API_KEY no .env'
         }
@@ -241,8 +252,12 @@ def _gerar_dados_pagamento(compra, metodo_pagamento, usuario=None):
     try:
         import requests
         
-        # Valor em centavos (int)
+        # Valor em centavos (int) — total da compra
         amount_cents = int(float(compra['valor_total']) * 100)
+        
+        # AbacatePay exige mínimo de 100 centavos (R$1,00)
+        if amount_cents < 100:
+            raise ValueError(f'Valor mínimo para pagamento PIX é R$1,00. Seu total: R${float(compra["valor_total"]):.2f}')
         
         # Usar API billing/create
         url = 'https://api.abacatepay.com/v1/billing/create'
@@ -260,9 +275,9 @@ def _gerar_dados_pagamento(compra, metodo_pagamento, usuario=None):
             'methods': ['PIX'],
             'products': [{
                 'externalId': str(compra['id']),
-                'name': 'Títulos de Rifa',
+                'name': f"Títulos de Rifa ({compra['quantidade_titulos']}x)",
                 'description': f"Compra de {compra['quantidade_titulos']} título(s)",
-                'quantity': compra['quantidade_titulos'],
+                'quantity': 1,
                 'price': amount_cents
             }],
             'returnUrl': f'{frontend_url}/checkout/sucesso',
@@ -439,7 +454,7 @@ def consultar_pagamento(compra_id):
     Returns:
         tuple: (response dict, status code)
     """
-    compra = Compra.query.get(compra_id)
+    compra = Compra.get_by_public_id(compra_id)
 
     if not compra:
         return {'erro': 'Compra não encontrada'}, 404
@@ -449,7 +464,7 @@ def consultar_pagamento(compra_id):
 
     # Incluir dados da campanha
     campanha_data = {
-        'id': compra.campanha.id,
+        'id': compra.campanha.public_id,
         'titulo': compra.campanha.titulo,
         'slug': compra.campanha.slug,
         'imagem_principal': compra.campanha.imagem_principal,
@@ -469,7 +484,7 @@ def consultar_pagamento(compra_id):
         }
 
     return {
-        'compra_id': compra.id,
+        'compra_id': compra.public_id,
         'status_pagamento': compra.status_pagamento,
         'metodo_pagamento': compra.metodo_pagamento,
         'valor_total': float(compra.valor_total),
@@ -552,16 +567,14 @@ def processar_webhook(data, gateway='abacatepay', raw_body=None, signature=None)
             print("⚠️ Compra ID não encontrado no webhook")
             return {'erro': 'Compra ID não identificado'}, 400
 
-        # Converter para int
-        try:
-            compra_id = int(compra_id)
-        except:
-            print(f"⚠️ Compra ID inválido: {compra_id}")
-            return {'erro': 'Compra ID inválido'}, 400
-
-        # 3. Aprovar Compra
-        print(f"💰 Processando pagamento para Compra #{compra_id}")
-        compra = Compra.query.get(compra_id)
+        # 3. Aprovar Compra — buscar por public_id (UUID) ou int
+        print(f"💰 Processando pagamento para Compra {compra_id}")
+        compra = Compra.get_by_public_id(compra_id)
+        if not compra:
+            try:
+                compra = Compra.query.get(int(compra_id))
+            except (ValueError, TypeError):
+                pass
 
         if not compra:
             print(f"❌ Compra #{compra_id} não encontrada no banco")
@@ -607,7 +620,12 @@ def aprovar_pagamento_manual(compra_id, admin_user_id):
     if not admin or not admin.is_admin:
         return {'erro': 'Acesso negado'}, 403
 
-    compra = Compra.query.get(compra_id)
+    compra = Compra.get_by_public_id(compra_id)
+    if not compra:
+        try:
+            compra = Compra.query.get(int(compra_id))
+        except (ValueError, TypeError):
+            pass
 
     if not compra:
         return {'erro': 'Compra não encontrada'}, 404
@@ -616,7 +634,7 @@ def aprovar_pagamento_manual(compra_id, admin_user_id):
     if _verificar_e_marcar_expiracao(compra):
         return {
             'erro': 'Compra expirada - prazo de pagamento excedido',
-            'compra_id': compra.id,
+            'compra_id': compra.public_id,
             'expira_em': compra.expira_em.isoformat() if compra.expira_em else None
         }, 400
 
@@ -624,7 +642,7 @@ def aprovar_pagamento_manual(compra_id, admin_user_id):
     if compra.status_pagamento == 'aprovado':
         return {
             'mensagem': 'Pagamento já estava aprovado',
-            'compra_id': compra.id
+            'compra_id': compra.public_id
         }, 200
 
     # Aprovar e gerar títulos
@@ -640,7 +658,7 @@ def aprovar_pagamento_manual(compra_id, admin_user_id):
 
         return {
             'mensagem': 'Pagamento aprovado manualmente',
-            'compra_id': compra.id,
+            'compra_id': compra.public_id,
             'status_anterior': status_anterior,
             'status_atual': 'aprovado',
             'aprovado_por': admin.nome

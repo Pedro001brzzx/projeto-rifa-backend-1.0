@@ -8,6 +8,7 @@ from flask_jwt_extended import create_access_token
 from app.models import db, Usuario
 
 from app.utils.helpers import somente_numeros
+import uuid
 
 def registro_usuario(data):
     """
@@ -45,10 +46,11 @@ def registro_usuario(data):
         telefone=telefone,
         email=email,
         cpf=cpf,
+        public_id=str(uuid.uuid4()),
         cidade=data.get('cidade'),
         estado=data.get('estado')
     )
-    usuario.set_senha(senha)
+    usuario.set_password(senha)
     
     db.session.add(usuario)
     db.session.commit()
@@ -81,7 +83,7 @@ def login_usuario(data):
     if not usuario and telefone and len(telefone) in [10, 11]:
         usuario = Usuario.query.filter_by(telefone=f"55{telefone}").first()
     
-    if not usuario or not usuario.verificar_senha(senha):
+    if not usuario or not usuario.check_password(senha):
         return {'erro': 'Telefone ou senha inválidos'}, 401
     
     if not usuario.ativo:

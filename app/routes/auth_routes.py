@@ -13,6 +13,7 @@ auth_bp = Blueprint('auth', __name__, url_prefix='/api/auth')
 
 
 @auth_bp.route('/registro', methods=['POST'])
+@limiter.limit("5 per minute")
 def registro():
     """Endpoint para registro de novo usuário"""
     data = request.get_json()

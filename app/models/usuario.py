@@ -11,20 +11,32 @@ class Usuario(db.Model):
     
     id = db.Column(db.Integer, primary_key=True)
     public_id = db.Column(db.String(36), unique=True, nullable=True) # UUID
+    
     nome = db.Column(db.String(100), nullable=False)
     telefone = db.Column(db.String(20), nullable=False)
     email = db.Column(db.String(120), unique=True, nullable=False)
     cpf = db.Column(db.String(14), unique=True, nullable=False)
     senha_hash = db.Column(db.String(128))
+    
     is_admin = db.Column(db.Boolean, default=False)
+    ativo = db.Column(db.Boolean, default=True) # Added missing field
+    
+    # Address info found in DB schema
     cidade = db.Column(db.String(100))
     estado = db.Column(db.String(2))
+    endereco = db.Column(db.String(255)) # Added missing field
+    cep = db.Column(db.String(10)) # Added missing field
+    data_nascimento = db.Column(db.Date) # Added missing field
+    
     criado_em = db.Column(db.DateTime, default=datetime.utcnow)
     
     # Reset de Senha
     reset_token = db.Column(db.String(100), nullable=True)
     reset_token_expiration = db.Column(db.DateTime, nullable=True)
 
+    # Relationships are backrefs from Compra/Campanha, but we can define explicit ones if needed.
+    # purchases = db.relationship('Compra', back_populates='usuario') 
+    
     def __repr__(self):
         return f'<Usuario {self.nome}>'
 
@@ -33,6 +45,10 @@ class Usuario(db.Model):
 
     def check_password(self, password):
         return bcrypt.check_password_hash(self.senha_hash, password)
+
+    # Alias for compatibility if needed, but controller now uses check_password
+    def verificar_senha(self, password):
+         return self.check_password(password)
 
     def generate_reset_token(self):
         """Gera um token de recuperação de senha válido por 15 minutos"""
@@ -77,5 +93,6 @@ class Usuario(db.Model):
             'cidade': self.cidade,
             'estado': self.estado,
             'is_admin': self.is_admin,
-            'criado_em': self.criado_em.isoformat()
+            'ativo': self.ativo,
+            'criado_em': self.criado_em.isoformat() if self.criado_em else None
         }

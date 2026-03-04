@@ -37,7 +37,7 @@ def obter_dados_dashboard():
             'receita_total': float(total_vendas)
         },
         'ultimas_vendas': [{
-            'id': v.id,
+            'id': v.public_id,
             'campanha': v.campanha.titulo,
             'usuario': v.usuario.nome,
             'valor': float(v.valor_total),

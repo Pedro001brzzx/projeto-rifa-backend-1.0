@@ -3,8 +3,22 @@ Controller de Campanhas
 Contém a lógica de negócio para gerenciamento de campanhas
 """
 
-from datetime import datetime
-from app.models import db, Campanha, Usuario
+from datetime import datetime, date
+from app.models import db, Campanha, Usuario, TituloPremiado
+from app.models.compra import Compra
+from app.models.titulo import Titulo
+import uuid
+
+
+def _buscar_campanha_por_id(campanha_id):
+    """Busca campanha por public_id (UUID) ou id interno (int)"""
+    campanha = Campanha.query.filter_by(public_id=campanha_id).first()
+    if not campanha:
+        try:
+            campanha = Campanha.query.get(int(campanha_id))
+        except (ValueError, TypeError):
+            pass
+    return campanha
 
 
 def listar_campanhas(status=None, page=1, per_page=20):
@@ -24,7 +38,7 @@ def listar_campanhas(status=None, page=1, per_page=20):
     if status:
         query = query.filter_by(status=status)
     
-    query = query.order_by(Campanha.data_sorteio.desc())
+    query = query.order_by(Campanha.criado_em.desc())
     
     campanhas = query.paginate(page=page, per_page=per_page, error_out=False)
     
@@ -99,6 +113,7 @@ def criar_campanha(usuario_id, data):
         # Criar nova campanha
         campanha = Campanha(
             titulo=data['titulo'],
+            public_id=str(uuid.uuid4()),
             descricao=data.get('descricao'),
             slug=slug,
             imagem_principal=data.get('imagem_principal'),
@@ -159,7 +174,7 @@ def deletar_campanha(usuario_id, campanha_id):
             return {'erro': 'Acesso negado'}, 403
         
         # Buscar campanha
-        campanha = Campanha.query.get(campanha_id)
+        campanha = _buscar_campanha_por_id(campanha_id)
         
         if not campanha:
             return {'erro': 'Campanha não encontrada'}, 404
@@ -201,7 +216,7 @@ def atualizar_campanha(usuario_id, campanha_id, data):
     if not usuario or not usuario.is_admin:
         return {'erro': 'Acesso negado'}, 403
     
-    campanha = Campanha.query.get(campanha_id)
+    campanha = _buscar_campanha_por_id(campanha_id)
     
     if not campanha:
         return {'erro': 'Campanha não encontrada'}, 404
@@ -243,3 +258,193 @@ def atualizar_campanha(usuario_id, campanha_id, data):
         'campanha': campanha.to_dict()
     }, 200
 
+def listar_titulos_premiados(slug):
+    """
+    Lista os títulos premiados de uma campanha pelo slug,
+    incluindo automaticamente o dono de cada número (se existir).
+    """
+    campanha = Campanha.query.filter_by(slug=slug).first()
+    
+    if not campanha:
+        return {'erro': 'Campanha não encontrada'}, 404
+        
+    titulos = TituloPremiado.query.filter_by(campanha_id=campanha.id).all()
+    
+    # Pré-carregar donos: dict { numero -> { compra_id, titulo_id, nome, telefone } }
+    numeros = [t.numero_titulo for t in titulos]
+    donos = {}
+    
+    if numeros:
+        resultados = db.session.query(
+            Titulo, Compra, Usuario
+        ).join(
+            Compra, Titulo.compra_id == Compra.id
+        ).join(
+            Usuario, Compra.usuario_id == Usuario.id
+        ).filter(
+            Titulo.campanha_id == campanha.id,
+            Titulo.numero.in_(numeros),
+            Compra.status_pagamento == 'aprovado'
+        ).all()
+
+        for titulo_obj, compra_obj, usuario_obj in resultados:
+            donos[titulo_obj.numero] = {
+                'compra_id': compra_obj.id,
+                'titulo_id': titulo_obj.id,
+                'usuario_id': usuario_obj.id,
+                'nome': usuario_obj.nome,
+                'telefone': usuario_obj.telefone,
+            }
+
+    titulos_data = []
+    for t in titulos:
+        d = t.to_dict()
+        dono = donos.get(t.numero_titulo)
+        if dono:
+            d['dono'] = dono
+        else:
+            d['dono'] = None
+        titulos_data.append(d)
+    
+    return {
+        'titulos_premiados': titulos_data,
+        'total': len(titulos_data),
+        'ganhos': sum(1 for t in titulos_data if t['status'] == 'ganho'),
+        'disponiveis': sum(1 for t in titulos_data if t['status'] == 'disponivel')
+    }, 200
+
+
+
+def adicionar_titulo_premiado(campanha_id, data):
+    """
+    Adiciona um título premiado a uma campanha (admin only)
+    campanha_id pode ser o public_id (UUID) ou slug
+    """
+    campanha = Campanha.query.filter_by(public_id=campanha_id).first()
+    if not campanha:
+        # Fallback: tentar buscar por id inteiro
+        try:
+            campanha = Campanha.query.get(int(campanha_id))
+        except (ValueError, TypeError):
+            pass
+    if not campanha:
+        return {'erro': 'Campanha não encontrada'}, 404
+
+    if not data.get('numero_titulo') or not data.get('valor_premio'):
+        return {'erro': 'Número do título e valor do prêmio são obrigatórios'}, 400
+
+    titulo = TituloPremiado(
+        campanha_id=campanha.id,
+        numero_titulo=data['numero_titulo'],
+        valor_premio=data['valor_premio'],
+        status='disponivel'
+    )
+
+    db.session.add(titulo)
+    db.session.commit()
+
+    return {'mensagem': 'Título premiado adicionado', 'titulo': titulo.to_dict()}, 201
+
+
+def deletar_titulo_premiado(titulo_id):
+    """
+    Deleta um título premiado (admin only)
+    """
+    titulo = TituloPremiado.query.get(titulo_id)
+    if not titulo:
+        return {'erro': 'Título premiado não encontrado'}, 404
+
+    db.session.delete(titulo)
+    db.session.commit()
+
+    return {'mensagem': 'Título premiado removido'}, 200
+
+
+def buscar_compradores(campanha_id, termo):
+    """
+    Busca compradores de uma campanha por nome, telefone ou número de cota
+    """
+    campanha = _buscar_campanha_por_id(campanha_id)
+    if not campanha:
+        return {'erro': 'Campanha não encontrada'}, 404
+
+    # Buscar titulos desta campanha com compras aprovadas
+    query = db.session.query(
+        Titulo, Compra, Usuario
+    ).join(
+        Compra, Titulo.compra_id == Compra.id
+    ).join(
+        Usuario, Compra.usuario_id == Usuario.id
+    ).filter(
+        Titulo.campanha_id == campanha.id,
+        Compra.status_pagamento == 'aprovado'
+    )
+
+    # Filtrar pelo termo de busca
+    if termo:
+        search = f'%{termo}%'
+        query = query.filter(
+            db.or_(
+                Usuario.nome.ilike(search),
+                Usuario.telefone.ilike(search),
+                Titulo.numero.ilike(search)
+            )
+        )
+
+    results = query.limit(50).all()
+
+    compradores = []
+    for titulo, compra, usuario in results:
+        compradores.append({
+            'compra_id': compra.id,
+            'titulo_id': titulo.id,
+            'usuario_id': usuario.id,
+            'nome': usuario.nome,
+            'telefone': usuario.telefone,
+            'numero_titulo': titulo.numero,
+            'data_compra': compra.criado_em.isoformat() + 'Z' if compra.criado_em else None
+        })
+
+    return {'compradores': compradores, 'total': len(compradores)}, 200
+
+
+def definir_ganhador(campanha_id, data):
+    """
+    Define o ganhador de uma campanha
+    """
+    campanha = _buscar_campanha_por_id(campanha_id)
+    if not campanha:
+        return {'erro': 'Campanha não encontrada'}, 404
+
+    compra_id = data.get('compra_id')
+    titulo_id = data.get('titulo_id')
+
+    if not compra_id:
+        return {'erro': 'ID da compra é obrigatório'}, 400
+
+    compra = Compra.query.get(compra_id)
+    if not compra:
+        return {'erro': 'Compra não encontrada'}, 404
+
+    # Definir ganhador na campanha
+    campanha.ganhador_id = compra.usuario_id
+    campanha.status = 'concluido'
+    campanha.data_conclusao = date.today()
+
+    # Marcar titulo como ganhador se fornecido
+    if titulo_id:
+        titulo = Titulo.query.get(titulo_id)
+        if titulo:
+            titulo.is_ganhador = True
+            # Buscar o número do título para registro
+            campanha.numero_sorteado = titulo.numero
+
+    db.session.commit()
+
+    return {
+        'mensagem': 'Ganhador definido com sucesso',
+        'ganhador': {
+            'nome': compra.usuario.nome,
+            'campanha': campanha.titulo
+        }
+    }, 200

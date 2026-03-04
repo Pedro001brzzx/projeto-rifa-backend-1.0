@@ -33,7 +33,7 @@ def meus_titulos():
     return jsonify(response), status
 
 
-@compra_bp.route('/compras/<int:compra_id>', methods=['DELETE'])
+@compra_bp.route('/compras/<string:compra_id>', methods=['DELETE'])
 @jwt_required()
 @admin_required()
 def deletar_compra(compra_id):

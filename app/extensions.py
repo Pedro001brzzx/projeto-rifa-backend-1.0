@@ -9,5 +9,6 @@ db = SQLAlchemy()
 bcrypt = Bcrypt()
 limiter = Limiter(
     key_func=get_remote_address,
+    storage_uri="memory://",
     default_limits=["100 per minute"]
 )
