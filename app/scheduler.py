@@ -22,9 +22,14 @@ def init_scheduler(app):
     if scheduler is None:
         scheduler = BackgroundScheduler(daemon=True)
         
+        # Wrapper que executa o job dentro do app_context correto
+        def job_com_contexto():
+            with app.app_context():
+                cancelar_compras_expiradas()
+        
         # Adicionar job de limpeza de compras expiradas
         scheduler.add_job(
-            func=cancelar_compras_expiradas,
+            func=job_com_contexto,
             trigger="interval",
             minutes=1,  # Executa a cada 1 minuto
             id='cleanup_expired_purchases',
@@ -37,5 +42,4 @@ def init_scheduler(app):
         # Registrar shutdown limpo
         atexit.register(lambda: scheduler.shutdown() if scheduler else None)
         
-        with app.app_context():
-            print("✅ APScheduler iniciado - Limpeza de compras a cada 1 minuto")
+        print("✅ APScheduler iniciado - Limpeza de compras a cada 1 minuto")
