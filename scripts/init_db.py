@@ -15,7 +15,6 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')
 
 from app import create_app
 from app.models import db, Usuario
-from werkzeug.security import generate_password_hash
 
 def init_db():
     config_name = os.getenv('FLASK_ENV', 'production')
@@ -39,7 +38,7 @@ def init_db():
         admin = Usuario.query.filter_by(telefone=admin_telefone).first()
         if admin:
             logger.info(f"O administrador {admin_telefone} já existe. Atualizando senha e previlégios...")
-            admin.senha_hash = generate_password_hash(admin_senha)
+            admin.set_password(admin_senha)
             admin.is_admin = True
             db.session.commit()
             logger.info("✅ Administrador atualizado com sucesso!")
@@ -48,9 +47,12 @@ def init_db():
             novo_admin = Usuario(
                 nome=admin_nome,
                 telefone=admin_telefone,
-                senha_hash=generate_password_hash(admin_senha),
-                is_admin=True
+                email="admin@email.com",
+                cpf="00000000000",
+                is_admin=True,
+                ativo=True
             )
+            novo_admin.set_password(admin_senha)
             db.session.add(novo_admin)
             db.session.commit()
             logger.info("✅ Administrador criado com sucesso!")
