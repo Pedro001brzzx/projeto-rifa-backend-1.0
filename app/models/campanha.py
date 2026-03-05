@@ -50,26 +50,25 @@ class Campanha(db.Model):
         return (self.total_titulos or 0) - (self.titulos_vendidos or 0)
 
     def to_dict(self, include_stats=False):
-        """Serializa o objeto para dicionário (CAMUFLADO)"""
         data = {
-            'id': self.public_id, # Public ID (UUID)
-            #'internal_id': self.id, # NEVER EXPOSE THIS
+            'id': self.id,
+            'public_id': self.public_id,
             'titulo': self.titulo,
-            'descricao': self.descricao,
             'slug': self.slug,
-            'imagem_principal': self.imagem_principal,
-            'status': self.status,
-            'tipo': self.tipo,
+            'descricao': self.descricao,
+            'regulamento': self.regulamento,
             'premio': self.premio,
+            'imagem_principal': self.imagem_principal,
+            'codigo': self.codigo,
+            'tipo': self.tipo,
             'valor_titulo': float(self.valor_titulo) if self.valor_titulo else None,
+            'status': self.status,
+            'data_sorteio': self.data_sorteio.isoformat() if self.data_sorteio else None,
+            'data_fim': self.data_fim.isoformat() if self.data_fim else None,
             'min_quantidade_compra': self.min_quantidade_compra,
             'max_quantidade_compra': self.max_quantidade_compra,
-            'data_sorteio': (self.data_sorteio.isoformat() + 'Z') if self.data_sorteio else None,
-            'data_conclusao': self.data_conclusao.strftime('%d/%m/%Y') if self.data_conclusao else None,
-            'numero_sorteado': self.numero_sorteado,
-            'criado_em': self.criado_em.isoformat() + 'Z',
         }
-        
+
         if include_stats:
             # CAMOUFLAGE: Show progress instead of raw counts
             total = self.total_titulos or 0
