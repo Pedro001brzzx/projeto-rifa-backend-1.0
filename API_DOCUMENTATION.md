@@ -327,13 +327,9 @@ Aceita `public_id` (UUID) ou `id` interno.
 ```json
 // Response 200
 { "mensagem": "Campanha deletada com sucesso" }
-
-// 400 — Com compras associadas
-{
-  "erro": "Não é possível deletar campanha com compras associadas",
-  "sugestao": "Considere alterar o status para 'cancelado'"
-}
 ```
+
+> **Atenção:** A exclusão realiza *cascade delete*, ou seja, apaga definitivamente todas as **Compras**, **Títulos** e **Títulos Premiados** associados à campanha para evitar erros de integridade no banco. Utilize com cautela.
 
 ---
 

@@ -179,12 +179,14 @@ def deletar_campanha(usuario_id, campanha_id):
         if not campanha:
             return {'erro': 'Campanha não encontrada'}, 404
         
-        # Verificar se há compras associadas
-        if campanha.compras.count() > 0:
-            return {
-                'erro': 'Não é possível deletar campanha com compras associadas',
-                'sugestao': 'Considere alterar o status para "cancelado" ao invés de deletar'
-            }, 400
+        # Excluir Títulos Premiados associados
+        TituloPremiado.query.filter_by(campanha_id=campanha.id).delete()
+        
+        # Excluir Títulos associados
+        Titulo.query.filter_by(campanha_id=campanha.id).delete()
+        
+        # Excluir Compras associadas
+        Compra.query.filter_by(campanha_id=campanha.id).delete()
         
         # Deletar campanha
         db.session.delete(campanha)
@@ -382,14 +384,26 @@ def buscar_compradores(campanha_id, termo):
 
     # Filtrar pelo termo de busca
     if termo:
+        search_digits = ''.join(filter(str.isdigit, termo))
         search = f'%{termo}%'
-        query = query.filter(
-            db.or_(
-                Usuario.nome.ilike(search),
-                Usuario.telefone.ilike(search),
-                Titulo.numero.ilike(search)
-            )
-        )
+        
+        # Cria condições OR
+        condicoes = [
+            Usuario.nome.ilike(search),
+            Titulo.numero.ilike(search)
+        ]
+        
+        if search_digits:
+             # Se for puramente números, checar telefone e cota
+             search_digits_like = f'%{search_digits}%'
+             # SQLite replace manual
+             telefone_limpo = db.func.replace(db.func.replace(db.func.replace(db.func.replace(Usuario.telefone, '(', ''), ')', ''), '-', ''), ' ', '')
+             condicoes.append(telefone_limpo.like(search_digits_like))
+             condicoes.append(Titulo.numero.ilike(search_digits_like))
+             # Checar também a cota com zero padding se for puramente número
+             condicoes.append(Titulo.numero == search_digits.zfill(6))
+             
+        query = query.filter(db.or_(*condicoes))
 
     results = query.limit(50).all()
 
