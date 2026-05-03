@@ -1,6 +1,8 @@
 
-from datetime import datetime
+from datetime import datetime, timezone
 from app.extensions import db
+
+_UTC = timezone.utc
 
 class AdminLog(db.Model):
     __tablename__ = 'admin_logs'
@@ -11,7 +13,7 @@ class AdminLog(db.Model):
     details = db.Column(db.Text, nullable=True)
     ip_address = db.Column(db.String(45), nullable=True) # IPv6 support
     user_agent = db.Column(db.String(255), nullable=True)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    created_at = db.Column(db.DateTime, default=lambda: datetime.now(_UTC).replace(tzinfo=None))
     
     # Relacionamento
     admin = db.relationship('Usuario', foreign_keys=[admin_id])

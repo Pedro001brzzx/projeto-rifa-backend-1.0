@@ -166,7 +166,7 @@ def obter_perfil(usuario_id):
         tuple: (response dict, status code)
     """
     # Converter de volta para inteiro (JWT retorna string)
-    usuario = Usuario.query.get(int(usuario_id))
+    usuario = db.session.get(Usuario, int(usuario_id))
     
     if not usuario:
         return {'erro': 'Usuário não encontrado'}, 404
@@ -186,7 +186,7 @@ def atualizar_perfil(usuario_id, data):
         tuple: (response dict, status code)
     """
     # Converter de volta para inteiro (JWT retorna string)
-    usuario = Usuario.query.get(int(usuario_id))
+    usuario = db.session.get(Usuario, int(usuario_id))
     
     if not usuario:
         return {'erro': 'Usuário não encontrado'}, 404

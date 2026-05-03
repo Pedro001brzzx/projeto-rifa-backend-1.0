@@ -2,8 +2,10 @@
 Modelo de Artigo
 """
 
-from datetime import datetime
+from datetime import datetime, timezone
 from app.models import db
+
+_UTC = timezone.utc
 
 
 class Artigo(db.Model):
@@ -16,8 +18,8 @@ class Artigo(db.Model):
     imagem = db.Column(db.String(500))
     autor = db.Column(db.String(100))
     publicado = db.Column(db.Boolean, default=True)
-    criado_em = db.Column(db.DateTime, default=datetime.utcnow)
-    atualizado_em = db.Column(db.DateTime, onupdate=datetime.utcnow)
+    criado_em = db.Column(db.DateTime, default=lambda: datetime.now(_UTC).replace(tzinfo=None))
+    atualizado_em = db.Column(db.DateTime, onupdate=lambda: datetime.now(_UTC).replace(tzinfo=None))
     
     def to_dict(self):
         """Serializa o objeto para dicionário"""

@@ -7,7 +7,11 @@ import random
 import requests
 import os
 import uuid
+from datetime import datetime, timedelta, timezone
 from app.models import db, Campanha, Compra, Titulo
+from app.models.usuario import Usuario
+
+_UTC = timezone.utc
 
 # Constante: Número máximo de títulos únicos possíveis
 # Formato 0XXXXX permite números de 000000 a 099999
@@ -80,8 +84,7 @@ def criar_compra(usuario_id, data):
     )
     
     # IMPORTANTE: Definir prazo de expiração (10 minutos) ANTES de adicionar ao session
-    from datetime import datetime, timedelta
-    expiracao = datetime.utcnow() + timedelta(minutes=10)
+    expiracao = datetime.now(_UTC).replace(tzinfo=None) + timedelta(minutes=10)
     compra.expira_em = expiracao
     
     print(f"🕐 [DEBUG] Compra criada com expira_em: {expiracao.isoformat()}")
@@ -202,7 +205,7 @@ def listar_compras_usuario(usuario_id, page=1, per_page=20):
         return {'erro': 'ID de usuário inválido'}, 400
     
     # Data atual para verificar expiração em tempo real
-    now = datetime.utcnow()
+    now = datetime.now(_UTC).replace(tzinfo=None)
     
     # Ordenação Inteligente (Frontend Friendly)
     # 1. PENDENTES VÁLIDOS (Topo da lista): Status pendente E data de expiração no futuro
@@ -244,15 +247,8 @@ def deletar_compra(usuario_id, compra_id):
     Returns:
         tuple: (response dict, status code)
     """
-    from app.models import Usuario
-    
-    try:
-        usuario_id = int(usuario_id)
-    except (ValueError, TypeError):
-        return {'erro': 'ID de usuário inválido'}, 400
-    
     # Verificar se usuário é admin
-    usuario = Usuario.query.get(int(usuario_id))
+    usuario = db.session.get(Usuario, int(usuario_id))
     if not usuario or not usuario.is_admin:
         return {'erro': 'Acesso negado'}, 403
     
@@ -260,7 +256,7 @@ def deletar_compra(usuario_id, compra_id):
     compra = Compra.get_by_public_id(compra_id)
     if not compra:
         try:
-            compra = Compra.query.get(int(compra_id))
+            compra = db.session.get(Compra, int(compra_id))
         except (ValueError, TypeError):
             pass
     

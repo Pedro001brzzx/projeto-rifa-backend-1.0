@@ -15,7 +15,7 @@ def _buscar_campanha_por_id(campanha_id):
     campanha = Campanha.query.filter_by(public_id=campanha_id).first()
     if not campanha:
         try:
-            campanha = Campanha.query.get(int(campanha_id))
+            campanha = db.session.get(Campanha, int(campanha_id))
         except (ValueError, TypeError):
             pass
     return campanha
@@ -81,7 +81,7 @@ def criar_campanha(usuario_id, data):
     """
     try:
         # Converter de volta para inteiro (JWT retorna string)
-        usuario = Usuario.query.get(int(usuario_id))
+        usuario = db.session.get(Usuario, int(usuario_id))
         
         if not usuario or not usuario.is_admin:
             return {'erro': 'Acesso negado'}, 403
@@ -168,7 +168,7 @@ def deletar_campanha(usuario_id, campanha_id):
     """
     try:
         # Converter de volta para inteiro (JWT retorna string)
-        usuario = Usuario.query.get(int(usuario_id))
+        usuario = db.session.get(Usuario, int(usuario_id))
         
         if not usuario or not usuario.is_admin:
             return {'erro': 'Acesso negado'}, 403
@@ -213,7 +213,7 @@ def atualizar_campanha(usuario_id, campanha_id, data):
     Returns:
         tuple: (response dict, status code)
     """
-    usuario = Usuario.query.get(int(usuario_id))
+    usuario = db.session.get(Usuario, int(usuario_id))
     
     if not usuario or not usuario.is_admin:
         return {'erro': 'Acesso negado'}, 403
@@ -326,7 +326,7 @@ def adicionar_titulo_premiado(campanha_id, data):
     if not campanha:
         # Fallback: tentar buscar por id inteiro
         try:
-            campanha = Campanha.query.get(int(campanha_id))
+            campanha = db.session.get(Campanha, int(campanha_id))
         except (ValueError, TypeError):
             pass
     if not campanha:
@@ -352,7 +352,7 @@ def deletar_titulo_premiado(titulo_id):
     """
     Deleta um título premiado (admin only)
     """
-    titulo = TituloPremiado.query.get(titulo_id)
+    titulo = db.session.get(TituloPremiado, titulo_id)
     if not titulo:
         return {'erro': 'Título premiado não encontrado'}, 404
 
@@ -426,17 +426,20 @@ def definir_ganhador(campanha_id, data):
     """
     Define o ganhador de uma campanha
     """
+    from app.utils.admin_logger import log_admin_action
+
     campanha = _buscar_campanha_por_id(campanha_id)
     if not campanha:
         return {'erro': 'Campanha não encontrada'}, 404
 
     compra_id = data.get('compra_id')
     titulo_id = data.get('titulo_id')
+    metodo = data.get('metodo', 'manual')
 
     if not compra_id:
         return {'erro': 'ID da compra é obrigatório'}, 400
 
-    compra = Compra.query.get(compra_id)
+    compra = db.session.get(Compra, compra_id)
     if not compra:
         return {'erro': 'Compra não encontrada'}, 404
 
@@ -444,21 +447,32 @@ def definir_ganhador(campanha_id, data):
     campanha.ganhador_id = compra.usuario_id
     campanha.status = 'concluido'
     campanha.data_conclusao = date.today()
+    campanha.sorteio_metodo = metodo
 
     # Marcar titulo como ganhador se fornecido
     if titulo_id:
-        titulo = Titulo.query.get(titulo_id)
+        titulo = db.session.get(Titulo, titulo_id)
         if titulo:
             titulo.is_ganhador = True
-            # Buscar o número do título para registro
             campanha.numero_sorteado = titulo.numero
 
     db.session.commit()
+
+    log_admin_action(
+        'Definição de Ganhador',
+        details=(
+            f"campanha_id={campanha.public_id} | campanha='{campanha.titulo}' | "
+            f"ganhador_id={compra.usuario_id} | ganhador='{compra.usuario.nome}' | "
+            f"numero_sorteado={campanha.numero_sorteado} | metodo={metodo}"
+        ),
+    )
 
     return {
         'mensagem': 'Ganhador definido com sucesso',
         'ganhador': {
             'nome': compra.usuario.nome,
-            'campanha': campanha.titulo
+            'campanha': campanha.titulo,
+            'numero_sorteado': campanha.numero_sorteado,
+            'metodo': metodo,
         }
     }, 200

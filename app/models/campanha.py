@@ -2,8 +2,10 @@
 Modelo de Campanha
 """
 
-from datetime import datetime, date
+from datetime import datetime, date, timezone
 from app.models import db
+
+_UTC = timezone.utc
 
 
 class Campanha(db.Model):
@@ -25,17 +27,18 @@ class Campanha(db.Model):
     titulos_vendidos = db.Column(db.Integer, default=0)
     
     data_sorteio = db.Column(db.DateTime)
-    data_inicio = db.Column(db.DateTime, default=datetime.utcnow)
+    data_inicio = db.Column(db.DateTime, default=lambda: datetime.now(_UTC).replace(tzinfo=None))
     data_fim = db.Column(db.DateTime)
     
     status = db.Column(db.String(20), default='ativo')
     numero_sorteado = db.Column(db.String(50))
+    sorteio_metodo = db.Column(db.String(20), default='manual')
     ganhador_id = db.Column(db.Integer, db.ForeignKey('usuarios.id'), nullable=True)
     data_conclusao = db.Column(db.Date, nullable=True)
     regulamento = db.Column(db.Text)
     
-    criado_em = db.Column(db.DateTime, default=datetime.utcnow)
-    atualizado_em = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    criado_em = db.Column(db.DateTime, default=lambda: datetime.now(_UTC).replace(tzinfo=None))
+    atualizado_em = db.Column(db.DateTime, default=lambda: datetime.now(_UTC).replace(tzinfo=None), onupdate=lambda: datetime.now(_UTC).replace(tzinfo=None))
     
     min_quantidade_compra = db.Column(db.Integer, default=1)
     max_quantidade_compra = db.Column(db.Integer)

@@ -2,8 +2,10 @@
 Modelo de Título Premiado
 """
 
-from datetime import datetime
+from datetime import datetime, timezone
 from app.models import db
+
+_UTC = timezone.utc
 
 class TituloPremiado(db.Model):
     __tablename__ = 'titulos_premiados'
@@ -17,8 +19,8 @@ class TituloPremiado(db.Model):
     status = db.Column(db.String(20), default='disponivel') # disponivel, ganho
     data_sorteio = db.Column(db.DateTime)
     
-    criado_em = db.Column(db.DateTime, default=datetime.utcnow)
-    atualizado_em = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    criado_em = db.Column(db.DateTime, default=lambda: datetime.now(_UTC).replace(tzinfo=None))
+    atualizado_em = db.Column(db.DateTime, default=lambda: datetime.now(_UTC).replace(tzinfo=None), onupdate=lambda: datetime.now(_UTC).replace(tzinfo=None))
 
     # Relacionamentos
     campanha = db.relationship('Campanha', backref=db.backref('titulos_premiados', lazy=True))

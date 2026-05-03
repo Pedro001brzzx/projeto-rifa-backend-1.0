@@ -1,4 +1,4 @@
-# Documentação da API - Sistema de Rifas Gêmeos Brasil
+# Documentação da API - Sistema de Rifas 
 
 > Documentação completa para integração front-end
 

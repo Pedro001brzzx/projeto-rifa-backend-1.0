@@ -6,6 +6,7 @@ from functools import wraps
 from flask import jsonify
 from flask_jwt_extended import get_jwt_identity
 from app.models import Usuario
+from app.extensions import db
 
 
 def admin_required():
@@ -25,7 +26,7 @@ def admin_required():
         @wraps(fn)
         def wrapper(*args, **kwargs):
             usuario_id = get_jwt_identity()
-            usuario = Usuario.query.get(int(usuario_id))
+            usuario = db.session.get(Usuario, int(usuario_id))
             
             if not usuario:
                 return jsonify({'erro': 'Usuário não encontrado'}), 404

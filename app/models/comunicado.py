@@ -2,8 +2,10 @@
 Modelo de Comunicado
 """
 
-from datetime import datetime
+from datetime import datetime, timezone
 from app.models import db
+
+_UTC = timezone.utc
 
 
 class Comunicado(db.Model):
@@ -14,7 +16,7 @@ class Comunicado(db.Model):
     conteudo = db.Column(db.Text, nullable=False)
     tipo = db.Column(db.String(50))  # informativo, alerta, aviso
     ativo = db.Column(db.Boolean, default=True)
-    criado_em = db.Column(db.DateTime, default=datetime.utcnow)
+    criado_em = db.Column(db.DateTime, default=lambda: datetime.now(_UTC).replace(tzinfo=None))
     
     def to_dict(self):
         """Serializa o objeto para dicionário"""

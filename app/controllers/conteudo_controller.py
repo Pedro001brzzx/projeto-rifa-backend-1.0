@@ -46,19 +46,28 @@ def obter_artigo(slug):
     return artigo.to_dict(), 200
 
 
-def listar_comunicados():
+def listar_comunicados(page=1, per_page=10):
     """
-    Lista comunicados ativos (últimos 10)
-    
+    Lista comunicados ativos com paginação.
+
+    Args:
+        page: Número da página
+        per_page: Itens por página (máx. 50)
+
     Returns:
         tuple: (response dict, status code)
     """
-    comunicados = Comunicado.query.filter_by(ativo=True).order_by(
+    per_page = min(per_page, 50)
+    paginado = Comunicado.query.filter_by(ativo=True).order_by(
         Comunicado.criado_em.desc()
-    ).limit(10).all()
-    
+    ).paginate(page=page, per_page=per_page, error_out=False)
+
     return {
-        'comunicados': [c.to_dict() for c in comunicados]
+        'comunicados': [c.to_dict() for c in paginado.items],
+        'total': paginado.total,
+        'pagina': page,
+        'por_pagina': per_page,
+        'paginas': paginado.pages,
     }, 200
 
 
@@ -99,7 +108,7 @@ def atualizar_comunicado(comunicado_id, data):
     Returns:
         tuple: (response dict, status code)
     """
-    comunicado = Comunicado.query.get(comunicado_id)
+    comunicado = db.session.get(Comunicado, comunicado_id)
     if not comunicado:
         return {'erro': 'Comunicado não encontrado'}, 404
     
@@ -127,7 +136,7 @@ def deletar_comunicado(comunicado_id):
     Returns:
         tuple: (response dict, status code)
     """
-    comunicado = Comunicado.query.get(comunicado_id)
+    comunicado = db.session.get(Comunicado, comunicado_id)
     if not comunicado:
         return {'erro': 'Comunicado não encontrado'}, 404
     

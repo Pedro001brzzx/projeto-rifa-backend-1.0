@@ -2,8 +2,10 @@
 Modelo de Título
 """
 
-from datetime import datetime
+from datetime import datetime, timezone
 from app.models import db
+
+_UTC = timezone.utc
 
 
 class Titulo(db.Model):
@@ -14,7 +16,7 @@ class Titulo(db.Model):
     campanha_id = db.Column(db.Integer, db.ForeignKey('campanhas.id'), nullable=False)  # Desnormalização para performance
     numero = db.Column(db.String(20), nullable=False)
     is_ganhador = db.Column(db.Boolean, default=False)
-    criado_em = db.Column(db.DateTime, default=datetime.utcnow)
+    criado_em = db.Column(db.DateTime, default=lambda: datetime.now(_UTC).replace(tzinfo=None))
     
     # Índices para otimização de queries
     __table_args__ = (

@@ -11,12 +11,12 @@ def atualizar_campanha(usuario_id, campanha_id, data):
     Returns:
         tuple: (response dict, status code)
     """
-    usuario = Usuario.query.get(int(usuario_id))
+    usuario = db.session.get(Usuario, int(usuario_id))
     
     if not usuario or not usuario.is_admin:
         return {'erro': 'Acesso negado'}, 403
     
-    campanha = Campanha.query.get(campanha_id)
+    campanha = db.session.get(Campanha, campanha_id)
     
     if not campanha:
         return {'erro': 'Campanha não encontrada'}, 404

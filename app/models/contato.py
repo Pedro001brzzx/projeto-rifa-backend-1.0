@@ -2,8 +2,10 @@
 Modelo de Contato
 """
 
-from datetime import datetime
+from datetime import datetime, timezone
 from app.models import db
+
+_UTC = timezone.utc
 
 
 class Contato(db.Model):
@@ -16,7 +18,7 @@ class Contato(db.Model):
     assunto = db.Column(db.String(200))
     mensagem = db.Column(db.Text, nullable=False)
     respondido = db.Column(db.Boolean, default=False)
-    criado_em = db.Column(db.DateTime, default=datetime.utcnow)
+    criado_em = db.Column(db.DateTime, default=lambda: datetime.now(_UTC).replace(tzinfo=None))
     
     def to_dict(self):
         """Serializa o objeto para dicionário"""

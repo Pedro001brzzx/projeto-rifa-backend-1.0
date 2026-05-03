@@ -59,9 +59,21 @@ class ProductionConfig(Config):
     DEBUG = False
 
 
+class TestingConfig(Config):
+    """Configurações para testes automatizados"""
+    TESTING = True
+    DEBUG = False
+    SQLALCHEMY_DATABASE_URI = 'sqlite:///:memory:'
+    SECRET_KEY = 'test-secret-key-for-pytest-0000000'
+    JWT_SECRET_KEY = 'test-jwt-secret-key-for-pytest-00'
+    RATELIMIT_ENABLED = False
+    WTF_CSRF_ENABLED = False
+
+
 # Configuração padrão
 config = {
     'development': DevelopmentConfig,
     'production': ProductionConfig,
+    'testing': TestingConfig,
     'default': DevelopmentConfig
 }

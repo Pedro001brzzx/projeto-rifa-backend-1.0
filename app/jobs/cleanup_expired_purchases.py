@@ -3,9 +3,11 @@ Job de limpeza de compras expiradas
 Cancela compras pendentes que ultrapassaram o prazo de 10 minutos
 """
 
-from datetime import datetime
+from datetime import datetime, timezone
 from sqlalchemy import or_
 from app.models import db, Compra, Titulo
+
+_UTC = timezone.utc
 
 
 def cancelar_compras_expiradas():
@@ -21,9 +23,7 @@ def cancelar_compras_expiradas():
     Returns:
         int: Número de compras canceladas
     """
-    from datetime import datetime
-    
-    now = datetime.utcnow()
+    now = datetime.now(_UTC).replace(tzinfo=None)
     timestamp = now.strftime('%Y-%m-%d %H:%M:%S')
     
     print(f"\n🧹 [{timestamp}] Iniciando limpeza de compras expiradas...")
@@ -84,11 +84,11 @@ def cancelar_compras_expiradas():
             continue
     
     # Relatório final
-    timestamp_final = datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S')
+    timestamp_final = datetime.now(_UTC).replace(tzinfo=None).strftime('%Y-%m-%d %H:%M:%S')
     print(f"\n📋 [{timestamp_final}] Resumo da limpeza:")
     print(f"   • Compras canceladas: {compras_canceladas}")
     print(f"   • Títulos liberados: {titulos_liberados_total}")
-    print(f"   • Tempo de processamento: {(datetime.utcnow() - now).total_seconds():.2f}s\n")
+    print(f"   • Tempo de processamento: {(datetime.now(_UTC).replace(tzinfo=None) - now).total_seconds():.2f}s\n")
     
     return compras_canceladas
 

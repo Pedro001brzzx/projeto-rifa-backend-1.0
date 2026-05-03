@@ -32,7 +32,9 @@ def detalhes_artigo(slug):
 @conteudo_bp.route('/comunicados', methods=['GET'])
 def listar_comunicados():
     """Endpoint para listar comunicados"""
-    response, status = conteudo_controller.listar_comunicados()
+    page = request.args.get('page', 1, type=int)
+    per_page = request.args.get('per_page', 10, type=int)
+    response, status = conteudo_controller.listar_comunicados(page, per_page)
     return jsonify(response), status
 
 

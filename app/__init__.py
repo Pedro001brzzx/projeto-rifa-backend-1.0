@@ -3,6 +3,7 @@ Inicialização da Aplicação Flask - Gêmeos Brasil
 Factory Pattern para criação da aplicação
 """
 
+import os
 from flask import Flask, jsonify
 from flask_cors import CORS
 from flask_jwt_extended import JWTManager
@@ -51,16 +52,51 @@ def create_app(config_name='default'):
     # Registrar rota principal
     registrar_rota_principal(app)
     
-    # Inicializar scheduler de tarefas em background
-    try:
-        from app.scheduler import init_scheduler
-        init_scheduler(app)
-    except ImportError:
-        app.logger.warning("APScheduler não instalado. Execute: pip install apscheduler")
-    except Exception as e:
-        app.logger.error(f"Erro ao iniciar scheduler: {str(e)}")
-    
+    # Inicializar scheduler de tarefas em background (desativado em TESTING)
+    if not app.config.get('TESTING'):
+        try:
+            from app.scheduler import init_scheduler
+            init_scheduler(app)
+        except ImportError:
+            app.logger.warning("APScheduler não instalado. Execute: pip install apscheduler")
+        except Exception as e:
+            app.logger.error(f"Erro ao iniciar scheduler: {str(e)}")
+
+    # Inicializar Swagger UI (flasgger)
+    _init_swagger(app)
+
     return app
+
+
+def _init_swagger(app):
+    """Registra o Swagger UI em /apidocs/ usando swagger.yaml do projeto."""
+    try:
+        import yaml
+        from flasgger import Swagger
+
+        swagger_path = os.path.join(os.path.dirname(__file__), '..', 'swagger.yaml')
+        with open(swagger_path, 'r', encoding='utf-8') as f:
+            template = yaml.safe_load(f)
+
+        # Host dinâmico: usa BASE_URL em produção ou localhost em dev
+        base_url = os.getenv('BASE_URL', '')
+        if base_url:
+            host = base_url.replace('https://', '').replace('http://', '').rstrip('/')
+            template['host'] = host
+            template['schemes'] = ['https'] if base_url.startswith('https://') else ['http']
+        else:
+            template['host'] = 'localhost:5000'
+            template['schemes'] = ['http']
+
+        Swagger(app, template=template, config={
+            'headers': [],
+            'specs': [{'endpoint': 'apispec', 'route': '/apispec.json'}],
+            'swagger_ui': True,
+            'specs_route': '/apidocs/',
+            'static_url_path': '/flasgger_static',
+        })
+    except Exception as e:
+        app.logger.warning(f'Swagger UI não inicializado: {e}')
 
 
 def registrar_blueprints(app):

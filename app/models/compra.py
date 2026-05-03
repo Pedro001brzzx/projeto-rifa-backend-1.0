@@ -2,8 +2,10 @@
 Modelo de Compra
 """
 
-from datetime import datetime
+from datetime import datetime, timezone
 from app.models import db
+
+_UTC = timezone.utc
 
 
 class Compra(db.Model):
@@ -23,7 +25,7 @@ class Compra(db.Model):
     transacao_id = db.Column(db.String(100))
     
     data_pagamento = db.Column(db.DateTime)
-    criado_em = db.Column(db.DateTime, default=datetime.utcnow)
+    criado_em = db.Column(db.DateTime, default=lambda: datetime.now(_UTC).replace(tzinfo=None))
     expira_em = db.Column(db.DateTime) # Tempo limite para pagar
     
     pix_copia_cola = db.Column(db.Text)

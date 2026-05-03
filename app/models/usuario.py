@@ -2,8 +2,10 @@
 Modelo de Usuário
 """
 
-from datetime import datetime
+from datetime import datetime, timezone
 from app.models import db, bcrypt
+
+UTC = timezone.utc
 
 
 class Usuario(db.Model):
@@ -28,7 +30,7 @@ class Usuario(db.Model):
     cep = db.Column(db.String(10)) # Added missing field
     data_nascimento = db.Column(db.Date) # Added missing field
     
-    criado_em = db.Column(db.DateTime, default=datetime.utcnow)
+    criado_em = db.Column(db.DateTime, default=lambda: datetime.now(UTC).replace(tzinfo=None))
     
     # Reset de Senha
     reset_token = db.Column(db.String(100), nullable=True)
@@ -53,20 +55,18 @@ class Usuario(db.Model):
     def generate_reset_token(self):
         """Gera um token de recuperação de senha válido por 15 minutos"""
         import uuid
-        from datetime import datetime, timedelta
+        from datetime import timedelta
         
         self.reset_token = str(uuid.uuid4())
-        self.reset_token_expiration = datetime.utcnow() + timedelta(minutes=15)
+        self.reset_token_expiration = datetime.now(UTC).replace(tzinfo=None) + timedelta(minutes=15)
         return self.reset_token
 
     def is_reset_token_valid(self, token):
         """Verifica se o token é válido e não expirou"""
-        from datetime import datetime
-        
         if self.reset_token != token:
             return False
             
-        if self.reset_token_expiration < datetime.utcnow():
+        if self.reset_token_expiration < datetime.now(UTC).replace(tzinfo=None):
             return False
             
         return True

@@ -9,8 +9,11 @@ import qrcode
 import base64
 import json
 from io import BytesIO
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from app.models import db, Compra
+from app.models.usuario import Usuario
+
+_UTC = timezone.utc
 
 
 def gerar_qrcode_base64(payload_pix):
@@ -89,7 +92,7 @@ def _aprovar_e_gerar_titulos(compra):
 
     # 5. Atualizar status da compra
     compra.status_pagamento = 'aprovado'
-    compra.data_pagamento = datetime.utcnow()
+    compra.data_pagamento = datetime.now(_UTC).replace(tzinfo=None)
 
     db.session.commit()
 
@@ -111,8 +114,7 @@ def criar_checkout(usuario_id, data):
     if 'campanha_id' not in data or 'quantidade_titulos' not in data:
         return {'erro': 'campanha_id e quantidade_titulos são obrigatórios'}, 400
 
-    from app.models import Usuario
-    usuario_obj = Usuario.query.get(usuario_id)
+    usuario_obj = db.session.get(Usuario, int(usuario_id) if str(usuario_id).isdigit() else usuario_id)
 
     if not usuario_obj:
         return {'erro': 'Usuário não encontrado'}, 404
@@ -143,8 +145,7 @@ def criar_checkout(usuario_id, data):
         metodo_pagamento = data.get('metodo_pagamento', 'pix')
 
         # Preparar dados de pagamento baseado no método (AbacatePay)
-        from app.models import Usuario
-        usuario_obj = Usuario.query.get(usuario_id)
+        usuario_obj = db.session.get(Usuario, int(usuario_id) if str(usuario_id).isdigit() else usuario_id)
         
         # Chama o gateway (Camada Blindada)
         pagamento_data = _gerar_dados_pagamento(response_compra['compra'], metodo_pagamento, usuario_obj)
@@ -244,7 +245,7 @@ def _gerar_dados_pagamento(compra, metodo_pagamento, usuario=None):
             'qr_code': f'00020126580014br.gov.bcb.pix0136{compra_id_str}520400005303986540{float(compra["valor_total"]):.2f}5802BR5925Sistema Rifas6014SAO PAULO62070503***6304XXXX',
             'qr_code_base64': 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==',
             'copia_cola': f'00020126580014br.gov.bcb.pix{compra_id_str}',
-            'expira_em': (datetime.utcnow() + timedelta(minutes=10)).isoformat() + 'Z',
+            'expira_em': (datetime.now(_UTC).replace(tzinfo=None) + timedelta(minutes=10)).isoformat() + 'Z',
             'instrucoes': '⚠️ MODO DESENVOLVIMENTO - Configure ABACATEPAY_API_KEY no .env'
         }
 
@@ -385,7 +386,7 @@ def _gerar_dados_pagamento(compra, metodo_pagamento, usuario=None):
             'qr_code': qr_code_base64,
             'copia_cola': pix_payload,
             'qr_code_base64': qr_code_base64,
-            'expira_em': billing_data.get('expiresAt') or (datetime.utcnow() + timedelta(minutes=10)).isoformat() + 'Z',
+            'expira_em': billing_data.get('expiresAt') or (datetime.now(_UTC).replace(tzinfo=None) + timedelta(minutes=10)).isoformat() + 'Z',
             'instrucoes': 'MODO TESTE: Pague pelo painel AbacatePay ou aguarde (não use app de banco real).' if billing_data.get('devMode') else 'Escaneie o QR Code ou use o Copia e Cola no app do seu banco.'
         }
 
@@ -424,7 +425,7 @@ def _verificar_e_marcar_expiracao(compra):
 
     # Verificar se tem campo expira_em e se já expirou
     if hasattr(compra, 'expira_em') and compra.expira_em:
-        now = datetime.utcnow()
+        now = datetime.now(_UTC).replace(tzinfo=None)
 
         if compra.expira_em < now:
             # Compra expirada! Atualizar status
@@ -572,7 +573,7 @@ def processar_webhook(data, gateway='abacatepay', raw_body=None, signature=None)
         compra = Compra.get_by_public_id(compra_id)
         if not compra:
             try:
-                compra = Compra.query.get(int(compra_id))
+                compra = db.session.get(Compra, int(compra_id))
             except (ValueError, TypeError):
                 pass
 
@@ -613,17 +614,15 @@ def aprovar_pagamento_manual(compra_id, admin_user_id):
     Returns:
         tuple: (response dict, status code)
     """
-    from app.models import Usuario
-
     # Verificar se é admin
-    admin = Usuario.query.get(int(admin_user_id))
+    admin = db.session.get(Usuario, int(admin_user_id))
     if not admin or not admin.is_admin:
         return {'erro': 'Acesso negado'}, 403
 
     compra = Compra.get_by_public_id(compra_id)
     if not compra:
         try:
-            compra = Compra.query.get(int(compra_id))
+            compra = db.session.get(Compra, int(compra_id))
         except (ValueError, TypeError):
             pass
 
