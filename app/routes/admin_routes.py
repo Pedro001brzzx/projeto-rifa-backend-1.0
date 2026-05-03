@@ -32,3 +32,14 @@ def dashboard():
     """Dados para o dashboard admin"""
     response, status = admin_controller.obter_dados_dashboard()
     return jsonify(response), status
+
+
+@admin_bp.route('/campanhas/<campanha_id>/auditoria', methods=['GET'])
+@jwt_required()
+@admin_required()
+def auditoria_campanha(campanha_id):
+    """Retorna histórico de auditoria (AdminLog) de uma campanha (admin only)"""
+    page = request.args.get('page', 1, type=int)
+    per_page = request.args.get('per_page', 20, type=int)
+    response, status = admin_controller.obter_auditoria_campanha(campanha_id, page, per_page)
+    return jsonify(response), status

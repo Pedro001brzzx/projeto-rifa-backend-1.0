@@ -1,0 +1,1516 @@
+swagger: "2.0"
+info:
+  title: "API Gêmeos Brasil"
+  description: |
+    Sistema de Rifas - API REST completa para integração front-end.
+
+    ## Autenticação
+    Endpoints protegidos exigem JWT no header:
+    ```
+    Authorization: Bearer {token}
+    ```
+    O token é obtido via `/api/auth/login` ou `/api/auth/registro`.
+  version: "2.1"
+  contact:
+    email: "contato@gemeosbrasil.com"
+host: "localhost:5000"
+basePath: "/"
+schemes:
+  - "http"
+  - "https"
+consumes:
+  - "application/json"
+produces:
+  - "application/json"
+securityDefinitions:
+  Bearer:
+    type: "apiKey"
+    name: "Authorization"
+    in: "header"
+    description: "JWT Bearer Token. Formato: Bearer {token}"
+tags:
+  - name: "Autenticação"
+    description: "Registro, login e gerenciamento de perfil"
+  - name: "Campanhas"
+    description: "Gerenciamento de campanhas de rifas"
+  - name: "Títulos Premiados"
+    description: "Títulos com prêmios especiais dentro de campanhas"
+  - name: "Pagamentos"
+    description: "Checkout e processamento de pagamentos via PIX (AbacatePay)"
+  - name: "Compras"
+    description: "Consulta de compras e títulos do usuário"
+  - name: "Ganhadores"
+    description: "Listagem pública de ganhadores das campanhas"
+  - name: "Admin"
+    description: "Endpoints exclusivos para administradores"
+  - name: "Artigos"
+    description: "Conteúdo editorial publicado"
+  - name: "Comunicados"
+    description: "Comunicados e avisos do sistema"
+  - name: "Contato"
+    description: "Formulário de contato"
+
+paths:
+
+  # ==========================================================================
+  # AUTENTICAÇÃO
+  # ==========================================================================
+
+  /api/auth/registro:
+    post:
+      tags: ["Autenticação"]
+      summary: "Registrar novo usuário"
+      description: "Cria uma nova conta. Retorna o token JWT imediatamente."
+      parameters:
+        - in: "body"
+          name: "body"
+          required: true
+          schema:
+            type: "object"
+            required: ["nome", "telefone", "senha", "email", "cpf"]
+            properties:
+              nome:
+                type: "string"
+                example: "João Silva"
+              telefone:
+                type: "string"
+                example: "11999999999"
+                description: "Apenas dígitos, mínimo 10"
+              senha:
+                type: "string"
+                example: "senha123"
+              email:
+                type: "string"
+                example: "joao@email.com"
+              cpf:
+                type: "string"
+                example: "12345678900"
+                description: "Exatamente 11 dígitos"
+              cidade:
+                type: "string"
+                example: "São Paulo"
+              estado:
+                type: "string"
+                example: "SP"
+      responses:
+        201:
+          description: "Usuário registrado com sucesso"
+          schema:
+            type: "object"
+            properties:
+              mensagem:
+                type: "string"
+              token:
+                type: "string"
+              usuario:
+                $ref: "#/definitions/Usuario"
+        400:
+          description: "Dados inválidos ou usuário já existe"
+          schema:
+            $ref: "#/definitions/Erro"
+
+  /api/auth/login:
+    post:
+      tags: ["Autenticação"]
+      summary: "Fazer login"
+      description: "Aceita telefone com ou sem DDI 55."
+      parameters:
+        - in: "body"
+          name: "body"
+          required: true
+          schema:
+            type: "object"
+            required: ["telefone", "senha"]
+            properties:
+              telefone:
+                type: "string"
+                example: "11999999999"
+              senha:
+                type: "string"
+                example: "senha123"
+      responses:
+        200:
+          description: "Login realizado com sucesso"
+          schema:
+            type: "object"
+            properties:
+              mensagem:
+                type: "string"
+              token:
+                type: "string"
+              usuario:
+                $ref: "#/definitions/UsuarioResumido"
+        400:
+          description: "Campos obrigatórios faltando"
+          schema:
+            $ref: "#/definitions/Erro"
+        401:
+          description: "Telefone ou senha inválidos"
+          schema:
+            $ref: "#/definitions/Erro"
+        403:
+          description: "Usuário inativo"
+          schema:
+            $ref: "#/definitions/Erro"
+
+  /api/auth/logout:
+    post:
+      tags: ["Autenticação"]
+      summary: "Fazer logout"
+      security:
+        - Bearer: []
+      responses:
+        200:
+          description: "Logout realizado com sucesso"
+        401:
+          description: "Token ausente ou inválido"
+
+  /api/auth/perfil:
+    get:
+      tags: ["Autenticação"]
+      summary: "Obter perfil do usuário autenticado"
+      security:
+        - Bearer: []
+      responses:
+        200:
+          description: "Dados do perfil (CPF e e-mail mascarados)"
+          schema:
+            $ref: "#/definitions/Usuario"
+        401:
+          description: "Não autenticado"
+    put:
+      tags: ["Autenticação"]
+      summary: "Atualizar perfil"
+      security:
+        - Bearer: []
+      parameters:
+        - in: "body"
+          name: "body"
+          schema:
+            type: "object"
+            properties:
+              nome:
+                type: "string"
+              email:
+                type: "string"
+              cidade:
+                type: "string"
+              estado:
+                type: "string"
+      responses:
+        200:
+          description: "Perfil atualizado com sucesso"
+          schema:
+            type: "object"
+            properties:
+              mensagem:
+                type: "string"
+              usuario:
+                $ref: "#/definitions/Usuario"
+        401:
+          description: "Não autenticado"
+
+  /api/auth/forgot-password:
+    post:
+      tags: ["Autenticação"]
+      summary: "Solicitar recuperação de senha"
+      description: "Sempre retorna 200 por segurança, mesmo se o e-mail não existir."
+      parameters:
+        - in: "body"
+          name: "body"
+          required: true
+          schema:
+            type: "object"
+            required: ["email"]
+            properties:
+              email:
+                type: "string"
+                example: "joao@email.com"
+      responses:
+        200:
+          description: "Resposta sempre igual por segurança"
+          schema:
+            type: "object"
+            properties:
+              mensagem:
+                type: "string"
+        400:
+          description: "E-mail não informado"
+
+  /api/auth/reset-password:
+    post:
+      tags: ["Autenticação"]
+      summary: "Redefinir senha com token"
+      parameters:
+        - in: "body"
+          name: "body"
+          required: true
+          schema:
+            type: "object"
+            required: ["token", "senha"]
+            properties:
+              token:
+                type: "string"
+                description: "Token recebido por e-mail"
+              senha:
+                type: "string"
+                description: "Nova senha (mínimo 6 caracteres)"
+      responses:
+        200:
+          description: "Senha redefinida com sucesso"
+        400:
+          description: "Token inválido/expirado ou senha muito curta"
+
+  # ==========================================================================
+  # CAMPANHAS
+  # ==========================================================================
+
+  /api/campanhas:
+    get:
+      tags: ["Campanhas"]
+      summary: "Listar campanhas"
+      parameters:
+        - name: "status"
+          in: "query"
+          type: "string"
+          enum: ["ativo", "concluido", "cancelado"]
+          description: "Omitir retorna todas"
+        - name: "page"
+          in: "query"
+          type: "integer"
+          default: 1
+        - name: "per_page"
+          in: "query"
+          type: "integer"
+          default: 20
+      responses:
+        200:
+          description: "Lista de campanhas paginada"
+          schema:
+            type: "object"
+            properties:
+              campanhas:
+                type: "array"
+                items:
+                  $ref: "#/definitions/Campanha"
+              total:
+                type: "integer"
+              paginas:
+                type: "integer"
+              pagina_atual:
+                type: "integer"
+    post:
+      tags: ["Campanhas"]
+      summary: "Criar campanha"
+      security:
+        - Bearer: []
+      parameters:
+        - in: "body"
+          name: "body"
+          required: true
+          schema:
+            type: "object"
+            required: ["titulo", "premio", "valor_titulo", "total_titulos"]
+            properties:
+              titulo:
+                type: "string"
+                example: "iPhone 15 Pro Max"
+              descricao:
+                type: "string"
+              premio:
+                type: "string"
+                example: "iPhone 15 Pro Max 256GB"
+              imagem_principal:
+                type: "string"
+              valor_titulo:
+                type: "number"
+                example: 10.00
+              total_titulos:
+                type: "integer"
+                example: 10000
+              min_quantidade_compra:
+                type: "integer"
+                default: 1
+              max_quantidade_compra:
+                type: "integer"
+              data_sorteio:
+                type: "string"
+                format: "date-time"
+              regulamento:
+                type: "string"
+      responses:
+        201:
+          description: "Campanha criada com sucesso"
+          schema:
+            type: "object"
+            properties:
+              mensagem:
+                type: "string"
+              campanha:
+                $ref: "#/definitions/Campanha"
+        401:
+          description: "Não autenticado"
+        403:
+          description: "Acesso negado (requer admin)"
+
+  /api/campanhas/{campanha_id}:
+    get:
+      tags: ["Campanhas"]
+      summary: "Detalhes de uma campanha"
+      description: "Aceita slug (ex: iphone-15) ou public_id (UUID)."
+      parameters:
+        - name: "campanha_id"
+          in: "path"
+          required: true
+          type: "string"
+          description: "Slug ou public_id (UUID) da campanha"
+      responses:
+        200:
+          description: "Detalhes da campanha"
+          schema:
+            $ref: "#/definitions/Campanha"
+        404:
+          description: "Campanha não encontrada"
+    put:
+      tags: ["Campanhas"]
+      summary: "Atualizar campanha"
+      description: "Aceita slug ou public_id (UUID) no path."
+      security:
+        - Bearer: []
+      parameters:
+        - name: "campanha_id"
+          in: "path"
+          required: true
+          type: "string"
+          description: "Slug ou public_id (UUID) da campanha"
+        - in: "body"
+          name: "body"
+          schema:
+            type: "object"
+            properties:
+              titulo:
+                type: "string"
+              status:
+                type: "string"
+                enum: ["ativo", "concluido", "cancelado"]
+              data_sorteio:
+                type: "string"
+                format: "date-time"
+      responses:
+        200:
+          description: "Campanha atualizada"
+          schema:
+            type: "object"
+            properties:
+              mensagem:
+                type: "string"
+              campanha:
+                $ref: "#/definitions/Campanha"
+        401:
+          description: "Não autenticado"
+        403:
+          description: "Acesso negado"
+        404:
+          description: "Campanha não encontrada"
+    delete:
+      tags: ["Campanhas"]
+      summary: "Deletar campanha"
+      description: "Hard delete — remove permanentemente compras, títulos e títulos premiados associados."
+      security:
+        - Bearer: []
+      parameters:
+        - name: "campanha_id"
+          in: "path"
+          required: true
+          type: "string"
+          description: "Slug ou public_id (UUID) da campanha"
+      responses:
+        200:
+          description: "Campanha deletada com sucesso"
+        403:
+          description: "Acesso negado"
+        404:
+          description: "Campanha não encontrada"
+
+  /api/campanhas/{campanha_id}/compradores:
+    get:
+      tags: ["Campanhas"]
+      summary: "Buscar compradores da campanha"
+      description: "Busca por nome, telefone ou número de cota."
+      security:
+        - Bearer: []
+      parameters:
+        - name: "campanha_id"
+          in: "path"
+          required: true
+          type: "string"
+          description: "public_id (UUID) ou id interno"
+        - name: "q"
+          in: "query"
+          type: "string"
+          description: "Termo de busca"
+      responses:
+        200:
+          description: "Lista de compradores"
+          schema:
+            type: "object"
+            properties:
+              compradores:
+                type: "array"
+                items:
+                  $ref: "#/definitions/Comprador"
+              total:
+                type: "integer"
+        403:
+          description: "Acesso negado"
+
+  /api/campanhas/{campanha_id}/ganhador:
+    post:
+      tags: ["Campanhas"]
+      summary: "Definir ganhador da campanha"
+      security:
+        - Bearer: []
+      parameters:
+        - name: "campanha_id"
+          in: "path"
+          required: true
+          type: "string"
+        - in: "body"
+          name: "body"
+          required: true
+          schema:
+            type: "object"
+            required: ["compra_id", "titulo_id"]
+            properties:
+              compra_id:
+                type: "integer"
+              titulo_id:
+                type: "integer"
+      responses:
+        200:
+          description: "Ganhador definido. Campanha marcada como concluída."
+        403:
+          description: "Acesso negado"
+        404:
+          description: "Campanha ou título não encontrado"
+
+  # ==========================================================================
+  # TÍTULOS PREMIADOS
+  # ==========================================================================
+
+  /api/campanhas/{campanha_id}/titulos-premiados:
+    get:
+      tags: ["Títulos Premiados"]
+      summary: "Listar títulos premiados da campanha"
+      description: "Aceita slug ou public_id (UUID)."
+      parameters:
+        - name: "campanha_id"
+          in: "path"
+          required: true
+          type: "string"
+          description: "Slug ou public_id (UUID) da campanha"
+      responses:
+        200:
+          description: "Lista de títulos premiados"
+          schema:
+            type: "object"
+            properties:
+              titulos_premiados:
+                type: "array"
+                items:
+                  $ref: "#/definitions/TituloPremiado"
+              total:
+                type: "integer"
+              ganhos:
+                type: "integer"
+              disponiveis:
+                type: "integer"
+        404:
+          description: "Campanha não encontrada"
+    post:
+      tags: ["Títulos Premiados"]
+      summary: "Adicionar título premiado"
+      security:
+        - Bearer: []
+      parameters:
+        - name: "campanha_id"
+          in: "path"
+          required: true
+          type: "string"
+          description: "public_id (UUID) da campanha"
+        - in: "body"
+          name: "body"
+          required: true
+          schema:
+            type: "object"
+            required: ["numero_titulo", "valor_premio"]
+            properties:
+              numero_titulo:
+                type: "string"
+                example: "011111"
+              valor_premio:
+                type: "number"
+                example: 500.00
+      responses:
+        201:
+          description: "Título premiado adicionado"
+          schema:
+            type: "object"
+            properties:
+              mensagem:
+                type: "string"
+              titulo:
+                $ref: "#/definitions/TituloPremiado"
+        403:
+          description: "Acesso negado"
+
+  /api/campanhas/titulos-premiados/{titulo_id}:
+    delete:
+      tags: ["Títulos Premiados"]
+      summary: "Remover título premiado"
+      security:
+        - Bearer: []
+      parameters:
+        - name: "titulo_id"
+          in: "path"
+          required: true
+          type: "integer"
+      responses:
+        200:
+          description: "Título premiado removido"
+        403:
+          description: "Acesso negado"
+        404:
+          description: "Título não encontrado"
+
+  # ==========================================================================
+  # PAGAMENTOS
+  # ==========================================================================
+
+  /api/checkout:
+    post:
+      tags: ["Pagamentos"]
+      summary: "Criar checkout (iniciar compra com PIX)"
+      description: |
+        Cria a compra e gera o QR Code PIX via AbacatePay.
+        O perfil do usuário precisa ter CPF (11 dígitos), e-mail válido e telefone com DDD.
+        Em desenvolvimento sem ABACATEPAY_API_KEY, retorna dados mock.
+      security:
+        - Bearer: []
+      parameters:
+        - in: "body"
+          name: "body"
+          required: true
+          schema:
+            type: "object"
+            required: ["campanha_id", "quantidade_titulos"]
+            properties:
+              campanha_id:
+                type: "string"
+                description: "public_id da campanha"
+              quantidade_titulos:
+                type: "integer"
+                example: 10
+              metodo_pagamento:
+                type: "string"
+                default: "pix"
+      responses:
+        201:
+          description: "Checkout criado com sucesso"
+          schema:
+            type: "object"
+            properties:
+              mensagem:
+                type: "string"
+              compra_id:
+                type: "string"
+              status_pagamento:
+                type: "string"
+                example: "pendente"
+              valor_total:
+                type: "number"
+              pagamento:
+                $ref: "#/definitions/DadosPix"
+        400:
+          description: "Perfil incompleto, campanha inativa ou quantidade inválida"
+          schema:
+            type: "object"
+            properties:
+              erro:
+                type: "string"
+              categoria:
+                type: "string"
+                example: "perfil_incompleto"
+        401:
+          description: "Não autenticado"
+
+  /api/pagamentos/{compra_id}:
+    get:
+      tags: ["Pagamentos"]
+      summary: "Consultar status de pagamento"
+      description: "Atualiza automaticamente para 'expirado' se o prazo passou."
+      security:
+        - Bearer: []
+      parameters:
+        - name: "compra_id"
+          in: "path"
+          required: true
+          type: "string"
+          description: "public_id (UUID) ou id interno"
+      responses:
+        200:
+          description: "Status da compra"
+          schema:
+            $ref: "#/definitions/StatusPagamento"
+        401:
+          description: "Não autenticado"
+        404:
+          description: "Compra não encontrada"
+
+  /api/pagamentos/webhook:
+    post:
+      tags: ["Pagamentos"]
+      summary: "Webhook de confirmação de pagamento (AbacatePay)"
+      description: |
+        Recebe notificações do AbacatePay.
+        Em produção valida a assinatura HMAC-SHA256 via header `X-Webhook-Signature`.
+      parameters:
+        - name: "X-Webhook-Signature"
+          in: "header"
+          type: "string"
+          description: "Assinatura HMAC-SHA256 (obrigatória em produção)"
+        - in: "body"
+          name: "body"
+          required: true
+          schema:
+            type: "object"
+            properties:
+              event:
+                type: "string"
+                example: "billing.paid"
+              data:
+                type: "object"
+                properties:
+                  billing:
+                    type: "object"
+                    properties:
+                      id:
+                        type: "string"
+                      status:
+                        type: "string"
+                      products:
+                        type: "array"
+                        items:
+                          type: "object"
+                          properties:
+                            externalId:
+                              type: "string"
+      responses:
+        200:
+          description: "Evento processado ou ignorado"
+          schema:
+            type: "object"
+            properties:
+              mensagem:
+                type: "string"
+        400:
+          description: "Dados inválidos"
+        401:
+          description: "Assinatura inválida"
+        404:
+          description: "Compra não encontrada"
+
+  /api/pagamentos/{compra_id}/aprovar:
+    post:
+      tags: ["Pagamentos"]
+      summary: "Aprovar pagamento manualmente"
+      description: "Útil para pagamentos offline ou testes. Não aprova compras expiradas."
+      security:
+        - Bearer: []
+      parameters:
+        - name: "compra_id"
+          in: "path"
+          required: true
+          type: "string"
+      responses:
+        200:
+          description: "Pagamento aprovado manualmente"
+          schema:
+            type: "object"
+            properties:
+              mensagem:
+                type: "string"
+              compra_id:
+                type: "string"
+              status_anterior:
+                type: "string"
+              status_atual:
+                type: "string"
+              aprovado_por:
+                type: "string"
+        400:
+          description: "Compra expirada"
+        401:
+          description: "Não autenticado"
+        403:
+          description: "Acesso negado"
+        404:
+          description: "Compra não encontrada"
+
+  # ==========================================================================
+  # COMPRAS
+  # ==========================================================================
+
+  /api/meus-titulos:
+    get:
+      tags: ["Compras"]
+      summary: "Listar compras e títulos do usuário autenticado"
+      description: "Ordenação: Pendentes → Aprovadas → Expiradas."
+      security:
+        - Bearer: []
+      parameters:
+        - name: "page"
+          in: "query"
+          type: "integer"
+          default: 1
+        - name: "per_page"
+          in: "query"
+          type: "integer"
+          default: 20
+      responses:
+        200:
+          description: "Lista de compras do usuário"
+          schema:
+            type: "object"
+            properties:
+              compras:
+                type: "array"
+                items:
+                  $ref: "#/definitions/Compra"
+              total:
+                type: "integer"
+              paginas:
+                type: "integer"
+              pagina_atual:
+                type: "integer"
+        401:
+          description: "Não autenticado"
+
+  /api/compras/{compra_id}:
+    delete:
+      tags: ["Compras"]
+      summary: "Deletar compra"
+      security:
+        - Bearer: []
+      parameters:
+        - name: "compra_id"
+          in: "path"
+          required: true
+          type: "string"
+          description: "public_id (UUID) ou id interno"
+      responses:
+        200:
+          description: "Compra deletada com sucesso"
+        403:
+          description: "Acesso negado"
+        404:
+          description: "Compra não encontrada"
+
+  # ==========================================================================
+  # GANHADORES
+  # ==========================================================================
+
+  /api/ganhadores:
+    get:
+      tags: ["Ganhadores"]
+      summary: "Listar ganhadores públicos"
+      description: "Dados pessoais mascarados automaticamente."
+      parameters:
+        - name: "page"
+          in: "query"
+          type: "integer"
+          default: 1
+        - name: "per_page"
+          in: "query"
+          type: "integer"
+          default: 20
+      responses:
+        200:
+          description: "Lista de ganhadores"
+          schema:
+            type: "object"
+            properties:
+              ganhadores:
+                type: "array"
+                items:
+                  $ref: "#/definitions/Ganhador"
+              total:
+                type: "integer"
+              paginas:
+                type: "integer"
+
+  # ==========================================================================
+  # ADMIN
+  # ==========================================================================
+
+  /api/painel-secreto-x9/usuarios:
+    get:
+      tags: ["Admin"]
+      summary: "Listar todos os usuários"
+      description: "Prefixo configurável via variável ADMIN_ROUTE_SECRET."
+      security:
+        - Bearer: []
+      parameters:
+        - name: "page"
+          in: "query"
+          type: "integer"
+          default: 1
+        - name: "per_page"
+          in: "query"
+          type: "integer"
+          default: 20
+      responses:
+        200:
+          description: "Lista de usuários"
+          schema:
+            type: "object"
+            properties:
+              usuarios:
+                type: "array"
+                items:
+                  $ref: "#/definitions/Usuario"
+              total:
+                type: "integer"
+              paginas:
+                type: "integer"
+              pagina_atual:
+                type: "integer"
+        403:
+          description: "Acesso negado"
+
+  /api/painel-secreto-x9/dashboard:
+    get:
+      tags: ["Admin"]
+      summary: "Dados do dashboard administrativo"
+      security:
+        - Bearer: []
+      responses:
+        200:
+          description: "Estatísticas do sistema"
+          schema:
+            type: "object"
+            properties:
+              stats:
+                type: "object"
+                properties:
+                  total_usuarios:
+                    type: "integer"
+                  total_campanhas:
+                    type: "integer"
+                  campanhas_ativas:
+                    type: "integer"
+                  receita_total:
+                    type: "number"
+              ultimas_vendas:
+                type: "array"
+                items:
+                  type: "object"
+                  properties:
+                    id:
+                      type: "string"
+                    campanha:
+                      type: "string"
+                    usuario:
+                      type: "string"
+                    valor:
+                      type: "number"
+                    data:
+                      type: "string"
+        403:
+          description: "Acesso negado"
+
+  /api/painel-secreto-x9/campanhas/{campanha_id}/auditoria:
+    get:
+      tags: ["Admin"]
+      summary: "Auditoria de sorteio da campanha"
+      description: |
+        Retorna o histórico de `AdminLog` filtrado pela campanha.
+        Inclui todas as ações registradas (criação, atualização, definição de ganhador, etc.).
+        Prefixo do admin configurável via variável `ADMIN_ROUTE_SECRET`.
+      security:
+        - Bearer: []
+      parameters:
+        - name: "campanha_id"
+          in: "path"
+          required: true
+          type: "string"
+          description: "public_id (UUID) ou id interno da campanha"
+        - name: "page"
+          in: "query"
+          type: "integer"
+          default: 1
+        - name: "per_page"
+          in: "query"
+          type: "integer"
+          default: 20
+          description: "Máximo: 50"
+      responses:
+        200:
+          description: "Histórico de auditoria da campanha"
+          schema:
+            type: "object"
+            properties:
+              campanha_id:
+                type: "string"
+                format: "uuid"
+              campanha_titulo:
+                type: "string"
+              auditoria:
+                type: "array"
+                items:
+                  $ref: "#/definitions/AdminLog"
+              total:
+                type: "integer"
+              pagina:
+                type: "integer"
+              por_pagina:
+                type: "integer"
+              paginas:
+                type: "integer"
+        401:
+          description: "Não autenticado"
+        403:
+          description: "Acesso negado"
+        404:
+          description: "Campanha não encontrada"
+
+  # ==========================================================================
+  # ARTIGOS
+  # ==========================================================================
+
+  /api/artigos:
+    get:
+      tags: ["Artigos"]
+      summary: "Listar artigos publicados"
+      parameters:
+        - name: "page"
+          in: "query"
+          type: "integer"
+          default: 1
+        - name: "per_page"
+          in: "query"
+          type: "integer"
+          default: 10
+      responses:
+        200:
+          description: "Lista de artigos"
+          schema:
+            type: "object"
+            properties:
+              artigos:
+                type: "array"
+                items:
+                  type: "object"
+              total:
+                type: "integer"
+              paginas:
+                type: "integer"
+
+  /api/artigos/{slug}:
+    get:
+      tags: ["Artigos"]
+      summary: "Detalhes de um artigo"
+      parameters:
+        - name: "slug"
+          in: "path"
+          required: true
+          type: "string"
+      responses:
+        200:
+          description: "Artigo encontrado"
+        404:
+          description: "Artigo não encontrado"
+
+  # ==========================================================================
+  # COMUNICADOS
+  # ==========================================================================
+
+  /api/comunicados:
+    get:
+      tags: ["Comunicados"]
+      summary: "Listar comunicados ativos (paginado)"
+      description: |
+        Retorna comunicados ativos ordenados por data decrescente.
+        Suporta paginação via `?page` e `?per_page` (máx. 50 por página).
+      parameters:
+        - name: "page"
+          in: "query"
+          type: "integer"
+          default: 1
+          description: "Número da página (começa em 1)"
+        - name: "per_page"
+          in: "query"
+          type: "integer"
+          default: 10
+          description: "Itens por página (máximo: 50)"
+      responses:
+        200:
+          description: "Lista de comunicados paginada"
+          schema:
+            type: "object"
+            properties:
+              comunicados:
+                type: "array"
+                items:
+                  $ref: "#/definitions/Comunicado"
+              total:
+                type: "integer"
+                description: "Total de comunicados ativos"
+              pagina:
+                type: "integer"
+                description: "Página atual"
+              por_pagina:
+                type: "integer"
+                description: "Itens por página solicitados (respeitando máx. 50)"
+              paginas:
+                type: "integer"
+                description: "Total de páginas"
+    post:
+      tags: ["Comunicados"]
+      summary: "Criar comunicado"
+      security:
+        - Bearer: []
+      parameters:
+        - in: "body"
+          name: "body"
+          required: true
+          schema:
+            type: "object"
+            required: ["titulo", "conteudo"]
+            properties:
+              titulo:
+                type: "string"
+                example: "Manutenção Programada"
+              conteudo:
+                type: "string"
+              tipo:
+                type: "string"
+                enum: ["informativo", "alerta", "aviso"]
+                default: "informativo"
+              ativo:
+                type: "boolean"
+                default: true
+      responses:
+        201:
+          description: "Comunicado criado"
+          schema:
+            type: "object"
+            properties:
+              mensagem:
+                type: "string"
+              comunicado:
+                $ref: "#/definitions/Comunicado"
+        400:
+          description: "Campos obrigatórios faltando"
+        403:
+          description: "Acesso negado"
+
+  /api/comunicados/{id}:
+    put:
+      tags: ["Comunicados"]
+      summary: "Atualizar comunicado"
+      security:
+        - Bearer: []
+      parameters:
+        - name: "id"
+          in: "path"
+          required: true
+          type: "integer"
+        - in: "body"
+          name: "body"
+          schema:
+            type: "object"
+            properties:
+              titulo:
+                type: "string"
+              conteudo:
+                type: "string"
+              tipo:
+                type: "string"
+              ativo:
+                type: "boolean"
+      responses:
+        200:
+          description: "Comunicado atualizado"
+        403:
+          description: "Acesso negado"
+        404:
+          description: "Comunicado não encontrado"
+    delete:
+      tags: ["Comunicados"]
+      summary: "Excluir comunicado"
+      security:
+        - Bearer: []
+      parameters:
+        - name: "id"
+          in: "path"
+          required: true
+          type: "integer"
+      responses:
+        200:
+          description: "Comunicado excluído com sucesso"
+        403:
+          description: "Acesso negado"
+        404:
+          description: "Comunicado não encontrado"
+
+  # ==========================================================================
+  # CONTATO
+  # ==========================================================================
+
+  /api/contato:
+    post:
+      tags: ["Contato"]
+      summary: "Enviar mensagem de contato"
+      parameters:
+        - in: "body"
+          name: "body"
+          required: true
+          schema:
+            type: "object"
+            required: ["nome", "email", "mensagem"]
+            properties:
+              nome:
+                type: "string"
+                example: "João Silva"
+              email:
+                type: "string"
+                example: "joao@email.com"
+              mensagem:
+                type: "string"
+                example: "Tenho uma dúvida sobre o sorteio."
+              telefone:
+                type: "string"
+              assunto:
+                type: "string"
+      responses:
+        201:
+          description: "Mensagem enviada com sucesso"
+        400:
+          description: "Campos obrigatórios faltando"
+
+# ==========================================================================
+# DEFINITIONS
+# ==========================================================================
+
+definitions:
+
+  Erro:
+    type: "object"
+    properties:
+      erro:
+        type: "string"
+
+  Usuario:
+    type: "object"
+    properties:
+      id:
+        type: "integer"
+      nome:
+        type: "string"
+      telefone:
+        type: "string"
+      email:
+        type: "string"
+        description: "Mascarado: jo***@email.com"
+      cpf:
+        type: "string"
+        description: "Mascarado: 123.***.***-**"
+      cidade:
+        type: "string"
+      estado:
+        type: "string"
+      is_admin:
+        type: "boolean"
+      criado_em:
+        type: "string"
+        format: "date-time"
+
+  UsuarioResumido:
+    type: "object"
+    properties:
+      id:
+        type: "integer"
+      nome:
+        type: "string"
+      telefone:
+        type: "string"
+      is_admin:
+        type: "boolean"
+
+  Campanha:
+    type: "object"
+    properties:
+      id:
+        type: "integer"
+      public_id:
+        type: "string"
+        format: "uuid"
+      titulo:
+        type: "string"
+      slug:
+        type: "string"
+      descricao:
+        type: "string"
+      regulamento:
+        type: "string"
+      premio:
+        type: "string"
+      imagem_principal:
+        type: "string"
+      valor_titulo:
+        type: "number"
+      status:
+        type: "string"
+        enum: ["ativo", "concluido", "cancelado"]
+      data_sorteio:
+        type: "string"
+        format: "date-time"
+      total_titulos:
+        type: "integer"
+      titulos_vendidos:
+        type: "integer"
+      titulos_disponiveis:
+        type: "integer"
+      progresso:
+        type: "number"
+        description: "Percentual vendido"
+      totalTickets:
+        type: "integer"
+      soldTickets:
+        type: "integer"
+      availableTickets:
+        type: "integer"
+      min_quantidade_compra:
+        type: "integer"
+      max_quantidade_compra:
+        type: "integer"
+      ganhador:
+        $ref: "#/definitions/GanhadorCampanha"
+
+  GanhadorCampanha:
+    type: "object"
+    description: "Presente apenas quando a campanha está concluída com vencedor"
+    properties:
+      nome:
+        type: "string"
+        example: "Pedro ***"
+      cidade:
+        type: "string"
+      estado:
+        type: "string"
+      telefone:
+        type: "string"
+        example: "(**) *****-1234"
+      numero_sorteado:
+        type: "string"
+      premio:
+        type: "string"
+      data_conclusao:
+        type: "string"
+        example: "15/03/2026"
+
+  TituloPremiado:
+    type: "object"
+    properties:
+      id:
+        type: "integer"
+      numero_titulo:
+        type: "string"
+      valor_premio:
+        type: "number"
+      status:
+        type: "string"
+        enum: ["disponivel", "ganho"]
+      ganhador_nome:
+        type: "string"
+      dono:
+        type: "object"
+        description: "null se nenhuma compra aprovada possui esse número"
+        properties:
+          compra_id:
+            type: "integer"
+          titulo_id:
+            type: "integer"
+          usuario_id:
+            type: "integer"
+          nome:
+            type: "string"
+          telefone:
+            type: "string"
+
+  DadosPix:
+    type: "object"
+    properties:
+      tipo:
+        type: "string"
+        example: "pix"
+      pix_code:
+        type: "string"
+      qr_code:
+        type: "string"
+        description: "Base64 da imagem PNG"
+      qr_code_base64:
+        type: "string"
+      copia_cola:
+        type: "string"
+      payment_url:
+        type: "string"
+      payment_id:
+        type: "string"
+      expira_em:
+        type: "string"
+        format: "date-time"
+      instrucoes:
+        type: "string"
+
+  StatusPagamento:
+    type: "object"
+    properties:
+      compra_id:
+        type: "string"
+      status_pagamento:
+        type: "string"
+        enum: ["pendente", "aprovado", "cancelado", "recusado", "expirado"]
+      metodo_pagamento:
+        type: "string"
+      valor_total:
+        type: "number"
+      quantidade_titulos:
+        type: "integer"
+      data_pagamento:
+        type: "string"
+        format: "date-time"
+      criado_em:
+        type: "string"
+        format: "date-time"
+      expira_em:
+        type: "string"
+        format: "date-time"
+      campanha:
+        type: "object"
+      pagamento:
+        $ref: "#/definitions/DadosPix"
+
+  Compra:
+    type: "object"
+    properties:
+      id:
+        type: "string"
+      campanha:
+        type: "object"
+      quantidade_titulos:
+        type: "integer"
+      valor_total:
+        type: "number"
+      status_pagamento:
+        type: "string"
+        enum: ["pendente", "aprovado", "cancelado", "recusado", "expirado"]
+      metodo_pagamento:
+        type: "string"
+      criado_em:
+        type: "string"
+        format: "date-time"
+      titulos:
+        type: "array"
+        items:
+          type: "object"
+          properties:
+            id:
+              type: "integer"
+            numero:
+              type: "string"
+            is_ganhador:
+              type: "boolean"
+
+  Ganhador:
+    type: "object"
+    properties:
+      id:
+        type: "string"
+        format: "uuid"
+        description: "public_id da campanha"
+      name:
+        type: "string"
+        example: "Pedro ***"
+      campaignTitle:
+        type: "string"
+      prize:
+        type: "string"
+      luckyNumber:
+        type: "string"
+      drawDate:
+        type: "string"
+        example: "15/03/2026"
+      phone:
+        type: "string"
+        example: "(**) *****-1234"
+
+  Comunicado:
+    type: "object"
+    properties:
+      id:
+        type: "integer"
+      titulo:
+        type: "string"
+      conteudo:
+        type: "string"
+      tipo:
+        type: "string"
+        enum: ["informativo", "alerta", "aviso"]
+      ativo:
+        type: "boolean"
+      criado_em:
+        type: "string"
+        format: "date-time"
+
+  Comprador:
+    type: "object"
+    properties:
+      compra_id:
+        type: "integer"
+      titulo_id:
+        type: "integer"
+      usuario_id:
+        type: "integer"
+      nome:
+        type: "string"
+      telefone:
+        type: "string"
+      numero_titulo:
+        type: "string"
+      data_compra:
+        type: "string"
+        format: "date-time"
+
+  AdminLog:
+    type: "object"
+    description: "Entrada de log de ação administrativa"
+    properties:
+      id:
+        type: "integer"
+      admin_name:
+        type: "string"
+        description: "Nome do administrador que executou a ação"
+      action:
+        type: "string"
+        example: "Definição de Ganhador"
+      details:
+        type: "string"
+        description: "Detalhes adicionais em texto livre"
+      ip_address:
+        type: "string"
+        example: "192.168.0.1"
+      created_at:
+        type: "string"
+        format: "date-time"
