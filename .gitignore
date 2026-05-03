@@ -54,9 +54,26 @@ Thumbs.db
 *.log
 logs/
 
-# Backups
+# Backups e arquivos temporários
 backups/
 *.bak
+*.backup
+init.py.backup
+
+# Arquivos de debug e diagnóstico (não versionar)
+debug_output*.txt
+debug_results*.log
+final_debug*.txt
+last_users.txt
+server.log
+
+# Configurações locais de editor (não versionar)
+settings.json
+
+# Node / Frontend (não faz parte deste backend)
+node_modules/
+package-lock.json
+yarn.lock
 
 # Jupyter Notebook
 .ipynb_checkpoints
