@@ -1,3 +1,10 @@
+"""
+Controller de Atualização de Campanha (parte auxiliar)
+"""
+
+from datetime import datetime
+from app.models import db, Campanha, Usuario
+
 
 def atualizar_campanha(usuario_id, campanha_id, data):
     """
