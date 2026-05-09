@@ -3,11 +3,13 @@ Rotas de Conteúdo
 Define os endpoints para artigos, comunicados e contato
 """
 
-from flask import Blueprint, request, jsonify
+from flask import Blueprint, request, jsonify, g
 from flask_jwt_extended import jwt_required
 from app.controllers import conteudo_controller
 from utils.decorators import admin_required
 from app.extensions import limiter
+from app.utils.validate_body import validate_body
+from app.schemas import ComunicadoSchema, AtualizarComunicadoSchema, ContatoSchema
 
 conteudo_bp = Blueprint('conteudo', __name__, url_prefix='/api')
 
@@ -17,7 +19,7 @@ def listar_artigos():
     """Endpoint para listar artigos"""
     page = request.args.get('page', 1, type=int)
     per_page = request.args.get('per_page', 10, type=int)
-    
+
     response, status = conteudo_controller.listar_artigos(page, per_page)
     return jsonify(response), status
 
@@ -41,9 +43,10 @@ def listar_comunicados():
 @conteudo_bp.route('/comunicados', methods=['POST'])
 @jwt_required()
 @admin_required()
+@validate_body(ComunicadoSchema)
 def criar_comunicado():
     """Endpoint para criar comunicado (admin only)"""
-    data = request.get_json()
+    data = g.validated_data
     response, status = conteudo_controller.criar_comunicado(data)
     return jsonify(response), status
 
@@ -51,9 +54,10 @@ def criar_comunicado():
 @conteudo_bp.route('/comunicados/<int:id>', methods=['PUT'])
 @jwt_required()
 @admin_required()
+@validate_body(AtualizarComunicadoSchema)
 def atualizar_comunicado(id):
     """Endpoint para atualizar comunicado (admin only)"""
-    data = request.get_json()
+    data = g.validated_data
     response, status = conteudo_controller.atualizar_comunicado(id, data)
     return jsonify(response), status
 
@@ -69,9 +73,9 @@ def deletar_comunicado(id):
 
 @conteudo_bp.route('/contato', methods=['POST'])
 @limiter.limit("3 per minute")
+@validate_body(ContatoSchema)
 def enviar_contato():
     """Endpoint para enviar mensagem de contato"""
-    data = request.get_json()
+    data = g.validated_data
     response, status = conteudo_controller.enviar_contato(data)
     return jsonify(response), status
-

@@ -31,7 +31,8 @@ class Usuario(db.Model):
     data_nascimento = db.Column(db.Date) # Added missing field
     
     criado_em = db.Column(db.DateTime, default=lambda: datetime.now(UTC).replace(tzinfo=None))
-    
+    deleted_at = db.Column(db.DateTime, nullable=True)
+
     # Reset de Senha
     reset_token = db.Column(db.String(100), nullable=True)
     reset_token_expiration = db.Column(db.DateTime, nullable=True)

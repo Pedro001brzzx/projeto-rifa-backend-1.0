@@ -81,9 +81,6 @@ def criar_comunicado(data):
     Returns:
         tuple: (response dict, status code)
     """
-    if not data.get('titulo') or not data.get('conteudo'):
-        return {'erro': 'Título e conteúdo são obrigatórios'}, 400
-    
     comunicado = Comunicado(
         titulo=data['titulo'],
         conteudo=data['conteudo'],
@@ -156,9 +153,6 @@ def enviar_contato(data):
     Returns:
         tuple: (response dict, status code)
     """
-    if not data.get('nome') or not data.get('email') or not data.get('mensagem'):
-        return {'erro': 'Nome, email e mensagem são obrigatórios'}, 400
-    
     contato = Contato(
         nome=data['nome'],
         email=data['email'],

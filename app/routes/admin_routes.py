@@ -43,3 +43,14 @@ def auditoria_campanha(campanha_id):
     per_page = request.args.get('per_page', 20, type=int)
     response, status = admin_controller.obter_auditoria_campanha(campanha_id, page, per_page)
     return jsonify(response), status
+
+
+@admin_bp.route('/compras/expiradas', methods=['GET'])
+@jwt_required()
+@admin_required()
+def listar_compras_expiradas():
+    """Lista compras expiradas para consulta administrativa"""
+    page = request.args.get('page', 1, type=int)
+    per_page = request.args.get('per_page', 20, type=int)
+    response, status = admin_controller.listar_compras_expiradas(page, per_page)
+    return jsonify(response), status

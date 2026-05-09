@@ -7,7 +7,7 @@
 **Versão:** 2.1  
 **Formato de resposta:** JSON  
 **Autenticação:** JWT Bearer Token  
-**Última atualização:** Maio 2026 (Fase A concluída)
+**Última atualização:** Maio 2026 (Fases A, B, D e E concluídas)
 
 ---
 
@@ -60,23 +60,27 @@ tests/
 └── test_pagamentos.py   # Checkout, webhook, aprovação manual, admin (13 testes)
 ```
 
-> Os testes usam SQLite em memória — não afetam o banco de dados de desenvolvimento ou produção.
-> O scheduler de tarefas é desativado automaticamente no modo de teste.
+> Os testes usam SQLite em memória — não afetam o banco de dados de desenvolvimento ou produção.  
+> O scheduler de tarefas é desativado automaticamente no modo de teste.  
+> **Nota Fase B:** O campo `deleted_at` é criado automaticamente via `flask db upgrade` ou `db.create_all()`. Scripts manuais `migrate_fase_b.py` / `migrate_fase_c.py` são obsoletos — use Flask-Migrate.  
+> **Nota Fase D:** A validação Marshmallow retorna `400` para campos obrigatórios ausentes ou inválidos. Os testes existentes continuam válidos pois as asserções de status code `400` em cenários de erro são compatíveis com o novo formato de resposta.  
+> **Nota Fase E:** O projeto agora usa Flask-Migrate para versionamento de schema. Ver seção [Deploy Railway](#deploy-railway) para instruções de migração.
 
 ---
 
 ## Índice
 
 - [Autenticação](#autenticação)
-- [Campanhas](#campanhas)
+- [Campanhas](#campanhas) — incl. soft delete e restauração
 - [Títulos Premiados](#títulos-premiados)
 - [Checkout e Pagamentos](#checkout-e-pagamentos)
 - [Compras e Títulos](#compras-e-títulos)
 - [Ganhadores](#ganhadores)
-- [Admin](#admin)
+- [Admin](#admin) — incl. compras expiradas
 - [Artigos](#artigos)
 - [Comunicados](#comunicados)
 - [Contato](#contato)
+- [Validação de Entrada](#validação-de-entrada)
 - [Deploy (Railway)](#deploy-railway)
 - [Códigos de Status](#códigos-de-status)
 
@@ -387,16 +391,61 @@ Aceita `public_id` (UUID) ou `id` interno.
 
 ---
 
-### 11. Deletar Campanha
+### 11. Deletar Campanha (Soft Delete)
 
-**`DELETE /api/campanhas/{campanha_id}`** — Admin
+**`DELETE /api/campanhas/{campanha_id}`** — Admin  
+**`DELETE /api/campanhas/{campanha_id}?permanente=true`** — Admin (hard delete irreversível)
+
+Por padrão executa **soft delete**: a campanha é marcada com `deleted_at = now` e some das listagens públicas, mas pode ser restaurada. Com `?permanente=true`, a campanha e todos os registros associados são removidos permanentemente.
+
+| Parâmetro | Tipo | Padrão | Descrição |
+|-----------|------|--------|-----------|
+| `permanente` | boolean | `false` | `true` para hard delete irreversível |
+
+```json
+// Soft delete — Response 200
+{ "mensagem": "Campanha removida com sucesso (reversível via /restaurar)" }
+
+// Hard delete — Response 200
+{ "mensagem": "Campanha excluída permanentemente" }
+```
+
+**Erros:**
+
+| Código | Condição |
+|--------|----------|
+| `403` | Usuário não é admin |
+| `404` | Campanha não encontrada |
+| `409` | Campanha já está removida (soft delete duplicado) |
+
+> **Soft delete:** Campanhas removidas não aparecem em `GET /api/campanhas`, `GET /api/campanhas/{slug}` nem podem receber novas compras. O contador do dashboard também as exclui.  
+> **Hard delete:** Remove permanentemente Compras, Títulos e Títulos Premiados em cascade. Use com cautela — a operação é irreversível.
+
+---
+
+### 12. Restaurar Campanha
+
+**`POST /api/campanhas/{campanha_id}/restaurar`** — Admin
+
+Desfaz um soft delete, tornando a campanha visível novamente.
 
 ```json
 // Response 200
-{ "mensagem": "Campanha deletada com sucesso" }
+{
+  "mensagem": "Campanha restaurada com sucesso",
+  "campanha": { "...campos da campanha..." }
+}
 ```
 
-> **Hard delete:** Remove permanentemente a campanha e todos os registros associados (Compras, Títulos, Títulos Premiados) via cascade. Funciona mesmo que existam compras aprovadas. Use com cautela.
+**Erros:**
+
+| Código | Condição |
+|--------|----------|
+| `403` | Usuário não é admin |
+| `404` | Campanha não encontrada |
+| `409` | Campanha não está removida |
+
+> A ação é registrada no `AdminLog` com a action `"Restauração de Campanha"`.
 
 ---
 
@@ -871,13 +920,50 @@ Aceita `public_id` (UUID) ou `id` interno. Prefixo configurável via `ADMIN_ROUT
 }
 ```
 
-> Registra automaticamente: criação de campanha, atualização, exclusão e definição de ganhador (via `@with_admin_log`). O campo `details` contém `metodo` (manual/automatico), `ganhador_id`, `numero_sorteado` e `campanha_id` para o sorteio.
+> Registra automaticamente: criação de campanha, atualização, soft delete, restauração e definição de ganhador (via `@with_admin_log`). O campo `details` contém `metodo` (manual/automatico), `ganhador_id`, `numero_sorteado` e `campanha_id` para o sorteio.  
+> Ações do sistema (expiração automática de compras) aparecem com `admin_name = "Sistema/Desconhecido"`.
+
+---
+
+### 27. Compras Expiradas
+
+**`GET /api/painel-secreto-x9/compras/expiradas`** — Admin
+
+Lista todas as compras com `status_pagamento = 'expirado'`, ordenadas da mais recente para a mais antiga. Prefixo configurável via `ADMIN_ROUTE_SECRET`.
+
+| Parâmetro | Tipo | Padrão | Descrição |
+|-----------|------|--------|-----------|
+| `page` | integer | `1` | Página |
+| `per_page` | integer | `20` | Itens por página (máx. 50) |
+
+```json
+// Response 200
+{
+  "compras": [
+    {
+      "id": "uuid-da-compra",
+      "campanha": "iPhone 15 Pro Max",
+      "usuario": "João Silva",
+      "quantidade_titulos": 10,
+      "valor_total": 100.00,
+      "expira_em": "2026-05-07T14:10:00Z",
+      "criado_em": "2026-05-07T14:00:00Z"
+    }
+  ],
+  "total": 38,
+  "pagina": 1,
+  "por_pagina": 20,
+  "paginas": 2
+}
+```
+
+> Compras são expiradas automaticamente pelo scheduler a cada **5 minutos**. Cada execução gera uma entrada no `AdminLog` com `action = "Expiração Automática de Compras"` e os campos `compras_expiradas`, `titulos_liberados` e `duracao` em `details`.
 
 ---
 
 ## Artigos
 
-### 26. Listar Artigos
+### 28. Listar Artigos
 
 **`GET /api/artigos`** — Público
 
@@ -897,7 +983,7 @@ Aceita `public_id` (UUID) ou `id` interno. Prefixo configurável via `ADMIN_ROUT
 
 ---
 
-### 27. Detalhes do Artigo
+### 29. Detalhes do Artigo
 
 **`GET /api/artigos/{slug}`** — Público
 
@@ -913,7 +999,7 @@ Aceita `public_id` (UUID) ou `id` interno. Prefixo configurável via `ADMIN_ROUT
 
 ## Comunicados
 
-### 28. Listar Comunicados
+### 30. Listar Comunicados
 
 **`GET /api/comunicados`** — Público  
 Retorna comunicados ativos, ordenados do mais recente ao mais antigo, com suporte a paginação.
@@ -947,7 +1033,7 @@ Retorna comunicados ativos, ordenados do mais recente ao mais antigo, com suport
 
 ---
 
-### 29. Criar Comunicado
+### 31. Criar Comunicado
 
 **`POST /api/comunicados`** — Admin
 
@@ -964,7 +1050,7 @@ Retorna comunicados ativos, ordenados do mais recente ao mais antigo, com suport
 
 ---
 
-### 30. Atualizar Comunicado
+### 32. Atualizar Comunicado
 
 **`PUT /api/comunicados/{id}`** — Admin
 
@@ -977,7 +1063,7 @@ Retorna comunicados ativos, ordenados do mais recente ao mais antigo, com suport
 
 ---
 
-### 31. Excluir Comunicado
+### 33. Excluir Comunicado
 
 **`DELETE /api/comunicados/{id}`** — Admin
 
@@ -990,7 +1076,7 @@ Retorna comunicados ativos, ordenados do mais recente ao mais antigo, com suport
 
 ## Contato
 
-### 32. Enviar Mensagem de Contato
+### 34. Enviar Mensagem de Contato
 
 **`POST /api/contato`** — Público | Rate limit: 3/min
 
@@ -1011,7 +1097,111 @@ Retorna comunicados ativos, ordenados do mais recente ao mais antigo, com suport
 
 ---
 
+## Validação de Entrada
+
+Todos os endpoints de escrita (POST/PUT) utilizam validação automática via **Marshmallow**. Quando o corpo da requisição não satisfaz o schema esperado, a API retorna:
+
+**`400 Bad Request`**
+
+```json
+{
+  "erro": "Dados inválidos",
+  "campos": {
+    "email": ["Not a valid email address."],
+    "titulo": ["Missing data for required field."],
+    "quantidade_titulos": ["Must be greater than or equal to 1."]
+  }
+}
+```
+
+### Regras gerais
+
+| Regra | Comportamento |
+|-------|---------------|
+| Campo obrigatório ausente | `400` com `"Missing data for required field."` |
+| Campo extra não esperado | `400` com `"Unknown field."` |
+| Tipo inválido | `400` com mensagem descritiva do tipo esperado |
+| Email inválido | `400` com `"Not a valid email address."` |
+| Telefone com menos de 10 dígitos | `400` com `"Telefone inválido (mínimo 10 dígitos)."` |
+| CPF diferente de 11 dígitos | `400` com `"CPF deve conter exatamente 11 dígitos."` |
+| String fora do tamanho permitido | `400` com `"Shorter than minimum length X."` / `"Longer than maximum length X."` |
+
+### Campos opcionais em endpoints PUT
+
+Endpoints de atualização (`PUT`) aceitam qualquer subconjunto dos campos — campos ausentes são simplesmente ignorados, sem sobrescrever o valor atual. Exemplo: um `PUT /api/auth/perfil` enviando apenas `{ "cidade": "Recife" }` atualiza somente a cidade.
+
+### Schemas por endpoint
+
+| Endpoint | Schema |
+|----------|--------|
+| `POST /api/auth/registro` | `RegistroSchema` |
+| `POST /api/auth/login` | `LoginSchema` |
+| `POST /api/auth/forgot-password` | `ForgotSenhaSchema` |
+| `POST /api/auth/reset-password` | `ResetSenhaSchema` |
+| `PUT /api/auth/perfil` | `AtualizarPerfilSchema` |
+| `POST /api/campanhas` | `CriarCampanhaSchema` |
+| `PUT /api/campanhas/{id}` | `AtualizarCampanhaSchema` |
+| `POST /api/campanhas/{id}/titulos-premiados` | `TitulosPremiadosSchema` |
+| `POST /api/campanhas/{id}/ganhador` | `GanhadorSchema` |
+| `POST /api/compras` | `CheckoutSchema` |
+| `POST /api/comunicados` | `ComunicadoSchema` |
+| `PUT /api/comunicados/{id}` | `AtualizarComunicadoSchema` |
+| `POST /api/contato` | `ContatoSchema` |
+
+---
+
 ## Deploy Railway
+
+### Migrations de Schema (Flask-Migrate)
+
+O projeto usa **Flask-Migrate** para versionamento de schema. O `Procfile` já está configurado para rodar as migrations automaticamente a cada deploy:
+
+```
+release: flask db upgrade && python scripts/create_admin.py
+web:     gunicorn wsgi:app ...
+```
+
+O comando `release` executa **antes** do servidor subir. Para cada deploy:
+- Se o banco já estiver atualizado → `flask db upgrade` não faz nada
+- Se houver migrations pendentes → aplica em ordem antes do servidor receber tráfego
+
+**Primeiro deploy (banco PostgreSQL vazio):**
+
+```bash
+# O wsgi.py cria todas as tabelas via db.create_all() na inicialização.
+# O release phase stampa a baseline e aplica qualquer migration pendente.
+# Nenhuma ação manual necessária.
+```
+
+**Adicionar uma coluna nova (workflow completo):**
+
+```bash
+# 1. Editar o modelo (ex: app/models/usuario.py)
+
+# 2. Gerar migration localmente
+flask db migrate -m "adiciona campo X em usuarios"
+
+# 3. Revisar o arquivo gerado em migrations/versions/
+
+# 4. Aplicar localmente
+flask db upgrade
+
+# 5. Commitar modelo + migration juntos
+git add app/models/ migrations/
+git commit -m "feat: adiciona campo X"
+# Railway aplica via release: flask db upgrade no próximo deploy
+```
+
+**Comandos úteis:**
+
+```bash
+flask db current    # versão aplicada no banco
+flask db history    # histórico de migrations
+flask db upgrade    # aplica migrations pendentes
+flask db downgrade  # reverte a migration anterior
+```
+
+---
 
 ### Variáveis de Ambiente Obrigatórias
 

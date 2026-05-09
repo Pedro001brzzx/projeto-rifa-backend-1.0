@@ -9,8 +9,8 @@ from sqlalchemy import func
 import json
 
 def listar_usuarios(page=1, per_page=20):
-    """Lista todos os usuários cadastrados"""
-    users = Usuario.query.paginate(page=page, per_page=per_page, error_out=False)
+    """Lista todos os usuários cadastrados (exclui soft-deletados)"""
+    users = Usuario.query.filter(Usuario.deleted_at.is_(None)).paginate(page=page, per_page=per_page, error_out=False)
     
     return {
         'usuarios': [u.to_dict() for u in users.items],
@@ -21,9 +21,9 @@ def listar_usuarios(page=1, per_page=20):
 
 def obter_dados_dashboard():
     """Retorna estatísticas gerais para o dashboard"""
-    total_usuarios = Usuario.query.count()
-    total_campanhas = Campanha.query.count()
-    campanhas_ativas = Campanha.query.filter_by(status='ativo').count()
+    total_usuarios = Usuario.query.filter(Usuario.deleted_at.is_(None)).count()
+    total_campanhas = Campanha.query.filter(Campanha.deleted_at.is_(None)).count()
+    campanhas_ativas = Campanha.query.filter_by(status='ativo').filter(Campanha.deleted_at.is_(None)).count()
     
     # Total de vendas (soma dos valores)
     total_vendas = db.session.query(func.sum(Compra.valor_total)).scalar() or 0
@@ -91,4 +91,34 @@ def obter_auditoria_campanha(campanha_id, page=1, per_page=20):
         'pagina': page,
         'por_pagina': per_page,
         'paginas': logs.pages,
+    }, 200
+
+
+def listar_compras_expiradas(page=1, per_page=20):
+    """Lista compras com status expirado para consulta administrativa."""
+    per_page = min(per_page, 50)
+
+    compras = Compra.query.filter_by(
+        status_pagamento='expirado'
+    ).order_by(
+        Compra.criado_em.desc()
+    ).paginate(page=page, per_page=per_page, error_out=False)
+
+    return {
+        'compras': [
+            {
+                'id': c.public_id,
+                'campanha': c.campanha.titulo if c.campanha else None,
+                'usuario': c.usuario.nome if c.usuario else None,
+                'quantidade_titulos': c.quantidade_titulos,
+                'valor_total': float(c.valor_total),
+                'expira_em': (c.expira_em.isoformat() + 'Z') if c.expira_em else None,
+                'criado_em': (c.criado_em.isoformat() + 'Z') if c.criado_em else None,
+            }
+            for c in compras.items
+        ],
+        'total': compras.total,
+        'pagina': page,
+        'por_pagina': per_page,
+        'paginas': compras.pages,
     }, 200

@@ -8,7 +8,7 @@ from flask import Flask, jsonify
 from flask_cors import CORS
 from flask_jwt_extended import JWTManager
 from app.config import config
-from app.extensions import db, bcrypt, limiter
+from app.extensions import db, bcrypt, limiter, migrate
 from app.models import * # Import models to ensure they are registered
 
 def create_app(config_name='default'):
@@ -16,12 +16,13 @@ def create_app(config_name='default'):
     Factory function para criar a aplicação Flask
     """
     app = Flask(__name__)
-    
+
     # Carregar configurações
     app.config.from_object(config[config_name])
-    
+
     # Inicializar extensões
     db.init_app(app)
+    migrate.init_app(app, db)
     bcrypt.init_app(app)
     JWTManager(app)
     limiter.init_app(app)

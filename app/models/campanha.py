@@ -43,6 +43,8 @@ class Campanha(db.Model):
     min_quantidade_compra = db.Column(db.Integer, default=1)
     max_quantidade_compra = db.Column(db.Integer)
 
+    deleted_at = db.Column(db.DateTime, nullable=True)
+
     # Relacionamentos
     ganhador = db.relationship('Usuario', foreign_keys=[ganhador_id], backref='campanhas_ganhas')
     # Titulo e Compra relationships will be defined in their respective models or via backref

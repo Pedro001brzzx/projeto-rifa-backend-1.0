@@ -31,15 +31,15 @@ def init_scheduler(app):
         scheduler.add_job(
             func=job_com_contexto,
             trigger="interval",
-            minutes=1,  # Executa a cada 1 minuto
+            minutes=5,  # Executa a cada 5 minutos
             id='cleanup_expired_purchases',
             name='Limpar compras expiradas',
             replace_existing=True
         )
-        
+
         scheduler.start()
-        
+
         # Registrar shutdown limpo
         atexit.register(lambda: scheduler.shutdown() if scheduler else None)
-        
-        print("✅ APScheduler iniciado - Limpeza de compras a cada 1 minuto")
+
+        print("✅ APScheduler iniciado - Limpeza de compras a cada 5 minutos")

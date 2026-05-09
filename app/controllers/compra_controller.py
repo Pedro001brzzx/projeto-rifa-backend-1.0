@@ -40,7 +40,7 @@ def criar_compra(usuario_id, data):
     except (ValueError, TypeError):
         return {'erro': 'ID de usuário inválido'}, 400
 
-    campanha = Campanha.query.filter_by(public_id=data['campanha_id']).first()
+    campanha = Campanha.query.filter_by(public_id=data['campanha_id']).filter(Campanha.deleted_at.is_(None)).first()
     if not campanha:
         return {'erro': 'Campanha não encontrada'}, 404
     
@@ -221,7 +221,7 @@ def listar_compras_usuario(usuario_id, page=1, per_page=20):
     
     compras = Compra.query.filter_by(
         usuario_id=int(usuario_id)
-    ).order_by(
+    ).filter(Compra.deleted_at.is_(None)).order_by(
         status_priority.asc(),           # Prioridade calculada
         Compra.criado_em.desc()          # Mais recentes primeiro dentro do grupo
     ).paginate(

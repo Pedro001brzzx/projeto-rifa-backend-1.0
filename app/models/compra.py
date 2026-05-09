@@ -31,6 +31,8 @@ class Compra(db.Model):
     pix_copia_cola = db.Column(db.Text)
     pix_qr_code_base64 = db.Column(db.Text)
 
+    deleted_at = db.Column(db.DateTime, nullable=True)
+
     # Relacionamentos
     # Usuario relationship is usually defined on Usuario or via backref here
     usuario = db.relationship('Usuario', backref=db.backref('compras', lazy=True))

@@ -3,11 +3,13 @@ Controller de Campanhas
 Contém a lógica de negócio para gerenciamento de campanhas
 """
 
-from datetime import datetime, date
+from datetime import datetime, date, timezone
 from app.models import db, Campanha, Usuario, TituloPremiado
 from app.models.compra import Compra
 from app.models.titulo import Titulo
 import uuid
+
+_UTC = timezone.utc
 
 
 def _buscar_campanha_por_id(campanha_id):
@@ -33,11 +35,11 @@ def listar_campanhas(status=None, page=1, per_page=20):
     Returns:
         tuple: (response dict, status code)
     """
-    query = Campanha.query
-    
+    query = Campanha.query.filter(Campanha.deleted_at.is_(None))
+
     if status:
         query = query.filter_by(status=status)
-    
+
     query = query.order_by(Campanha.criado_em.desc())
     
     campanhas = query.paginate(page=page, per_page=per_page, error_out=False)
@@ -60,11 +62,11 @@ def obter_campanha_por_slug(slug):
     Returns:
         tuple: (response dict, status code)
     """
-    campanha = Campanha.query.filter_by(slug=slug).first()
-    
+    campanha = Campanha.query.filter_by(slug=slug).filter(Campanha.deleted_at.is_(None)).first()
+
     if not campanha:
         return {'erro': 'Campanha não encontrada'}, 404
-    
+
     return campanha.to_dict(include_stats=True), 200
 
 
@@ -85,9 +87,6 @@ def criar_campanha(usuario_id, data):
         
         if not usuario or not usuario.is_admin:
             return {'erro': 'Acesso negado'}, 403
-        
-        # Validação de campos obrigatórios
-        if 'titulo' not in data: return {'erro': 'Título é obrigatório'}, 400
         
         # Gerar slug automaticamente se não fornecido
         slug = data.get('slug')
@@ -155,50 +154,81 @@ def criar_campanha(usuario_id, data):
         return {'erro': f'Erro ao criar campanha: {str(e)}'}, 500
 
 
-def deletar_campanha(usuario_id, campanha_id):
+def deletar_campanha(usuario_id, campanha_id, permanente=False):
     """
-    Deleta uma campanha (apenas administradores)
-    
-    Args:
-        usuario_id: ID do usuário admin
-        campanha_id: ID da campanha a deletar
-    
-    Returns:
-        tuple: (response dict, status code)
+    Remove uma campanha (apenas administradores).
+
+    Por padrão executa soft delete (deleted_at = now).
+    Com permanente=True executa hard delete irreversível.
     """
     try:
-        # Converter de volta para inteiro (JWT retorna string)
         usuario = db.session.get(Usuario, int(usuario_id))
-        
+
         if not usuario or not usuario.is_admin:
             return {'erro': 'Acesso negado'}, 403
-        
-        # Buscar campanha
+
         campanha = _buscar_campanha_por_id(campanha_id)
-        
+
         if not campanha:
             return {'erro': 'Campanha não encontrada'}, 404
-        
-        # Excluir Títulos Premiados associados
-        TituloPremiado.query.filter_by(campanha_id=campanha.id).delete()
-        
-        # Excluir Títulos associados
-        Titulo.query.filter_by(campanha_id=campanha.id).delete()
-        
-        # Excluir Compras associadas
-        Compra.query.filter_by(campanha_id=campanha.id).delete()
-        
-        # Deletar campanha
-        db.session.delete(campanha)
+
+        if permanente:
+            # Hard delete — remove todos os registros associados
+            TituloPremiado.query.filter_by(campanha_id=campanha.id).delete()
+            Titulo.query.filter_by(campanha_id=campanha.id).delete()
+            Compra.query.filter_by(campanha_id=campanha.id).delete()
+            db.session.delete(campanha)
+            db.session.commit()
+            return {'mensagem': 'Campanha excluída permanentemente'}, 200
+
+        # Soft delete
+        if campanha.deleted_at is not None:
+            return {'erro': 'Campanha já está removida. Use /restaurar para desfazer.'}, 409
+
+        campanha.deleted_at = datetime.now(_UTC).replace(tzinfo=None)
         db.session.commit()
-        
-        return {'mensagem': 'Campanha deletada com sucesso'}, 200
-        
+        return {'mensagem': 'Campanha removida com sucesso (reversível via /restaurar)'}, 200
+
     except Exception as e:
         import traceback
         traceback.print_exc()
         db.session.rollback()
         return {'erro': f'Erro ao deletar campanha: {str(e)}'}, 500
+
+
+def restaurar_campanha(usuario_id, campanha_id):
+    """
+    Restaura uma campanha removida via soft delete (apenas administradores).
+    """
+    try:
+        usuario = db.session.get(Usuario, int(usuario_id))
+
+        if not usuario or not usuario.is_admin:
+            return {'erro': 'Acesso negado'}, 403
+
+        # Busca incluindo soft-deletadas
+        campanha = Campanha.query.filter_by(public_id=campanha_id).first()
+        if not campanha:
+            try:
+                campanha = db.session.get(Campanha, int(campanha_id))
+            except (ValueError, TypeError):
+                pass
+
+        if not campanha:
+            return {'erro': 'Campanha não encontrada'}, 404
+
+        if campanha.deleted_at is None:
+            return {'erro': 'Campanha não está removida'}, 409
+
+        campanha.deleted_at = None
+        db.session.commit()
+        return {'mensagem': 'Campanha restaurada com sucesso', 'campanha': campanha.to_dict()}, 200
+
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        db.session.rollback()
+        return {'erro': f'Erro ao restaurar campanha: {str(e)}'}, 500
 
 
 def atualizar_campanha(usuario_id, campanha_id, data):
@@ -265,11 +295,11 @@ def listar_titulos_premiados(slug):
     Lista os títulos premiados de uma campanha pelo slug,
     incluindo automaticamente o dono de cada número (se existir).
     """
-    campanha = Campanha.query.filter_by(slug=slug).first()
-    
+    campanha = Campanha.query.filter_by(slug=slug).filter(Campanha.deleted_at.is_(None)).first()
+
     if not campanha:
         return {'erro': 'Campanha não encontrada'}, 404
-        
+
     titulos = TituloPremiado.query.filter_by(campanha_id=campanha.id).all()
     
     # Pré-carregar donos: dict { numero -> { compra_id, titulo_id, nome, telefone } }
@@ -331,9 +361,6 @@ def adicionar_titulo_premiado(campanha_id, data):
             pass
     if not campanha:
         return {'erro': 'Campanha não encontrada'}, 404
-
-    if not data.get('numero_titulo') or not data.get('valor_premio'):
-        return {'erro': 'Número do título e valor do prêmio são obrigatórios'}, 400
 
     titulo = TituloPremiado(
         campanha_id=campanha.id,
@@ -435,10 +462,6 @@ def definir_ganhador(campanha_id, data):
     compra_id = data.get('compra_id')
     titulo_id = data.get('titulo_id')
     metodo = data.get('metodo', 'manual')
-
-    if not compra_id:
-        return {'erro': 'ID da compra é obrigatório'}, 400
-
     compra = db.session.get(Compra, compra_id)
     if not compra:
         return {'erro': 'Compra não encontrada'}, 404

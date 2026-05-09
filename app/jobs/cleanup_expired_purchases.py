@@ -6,6 +6,7 @@ Cancela compras pendentes que ultrapassaram o prazo de 10 minutos
 from datetime import datetime, timezone
 from sqlalchemy import or_
 from app.models import db, Compra, Titulo
+from app.models.admin_log import AdminLog
 
 _UTC = timezone.utc
 
@@ -85,11 +86,30 @@ def cancelar_compras_expiradas():
     
     # Relatório final
     timestamp_final = datetime.now(_UTC).replace(tzinfo=None).strftime('%Y-%m-%d %H:%M:%S')
+    duracao = (datetime.now(_UTC).replace(tzinfo=None) - now).total_seconds()
     print(f"\n📋 [{timestamp_final}] Resumo da limpeza:")
     print(f"   • Compras canceladas: {compras_canceladas}")
     print(f"   • Títulos liberados: {titulos_liberados_total}")
-    print(f"   • Tempo de processamento: {(datetime.now(_UTC).replace(tzinfo=None) - now).total_seconds():.2f}s\n")
-    
+    print(f"   • Tempo de processamento: {duracao:.2f}s\n")
+
+    # Registrar resultado no AdminLog (admin_id=None = ação do sistema)
+    try:
+        log = AdminLog(
+            admin_id=None,
+            action='Expiração Automática de Compras',
+            details=(
+                f"compras_expiradas={compras_canceladas} | "
+                f"titulos_liberados={titulos_liberados_total} | "
+                f"duracao={duracao:.2f}s | "
+                f"timestamp={timestamp_final}"
+            ),
+        )
+        db.session.add(log)
+        db.session.commit()
+    except Exception as e:
+        db.session.rollback()
+        print(f"❌ Erro ao registrar AdminLog: {e}")
+
     return compras_canceladas
 
 

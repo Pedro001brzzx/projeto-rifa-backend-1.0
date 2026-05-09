@@ -14,21 +14,11 @@ def registro_usuario(data):
     """
     Registra um novo usuário no sistema
     """
-    # Sanitização e Validação
     nome = str(data.get('nome') or "").strip()
     email = str(data.get('email') or "").strip().lower()
     telefone = somente_numeros(data.get('telefone'))
     cpf = somente_numeros(data.get('cpf'))
     senha = data.get('senha')
-
-    if not telefone or not senha or not nome or not email or not cpf:
-        return {'erro': 'Nome, e-mail, telefone, CPF e senha são obrigatórios'}, 400
-    
-    if len(cpf) != 11:
-        return {'erro': 'CPF deve conter exatamente 11 dígitos'}, 400
-    
-    if len(telefone) < 10:
-        return {'erro': 'Telefone inválido (mínimo 10 dígitos)'}, 400
 
     # Verificar se usuário já existe
     if Usuario.query.filter_by(telefone=telefone).first():
@@ -71,9 +61,6 @@ def login_usuario(data):
     telefone_bruto = data.get('telefone')
     senha = data.get('senha')
 
-    if not telefone_bruto or not senha:
-        return {'erro': 'Por favor, preencha telefone e senha'}, 400
-    
     telefone = somente_numeros(telefone_bruto)
         
     # Tenta buscar pelo telefone purificado
@@ -103,10 +90,6 @@ def forgot_password(data):
     Inicia processo de recuperação de senha (Gera token e envia email)
     """
     email = data.get('email')
-    
-    if not email:
-        return {'erro': 'E-mail é obrigatório'}, 400
-    
     usuario = Usuario.query.filter_by(email=email).first()
     
     if usuario:
@@ -130,14 +113,6 @@ def reset_password(data):
     """
     token = data.get('token')
     nova_senha = data.get('senha')
-    
-    if not token or not nova_senha:
-        return {'erro': 'Token e nova senha são obrigatórios'}, 400
-        
-    # Validar complexidade da senha (mínimo 6 caracteres por enquanto)
-    if len(nova_senha) < 6:
-        return {'erro': 'A senha deve ter no mínimo 6 caracteres'}, 400
-        
     usuario = Usuario.query.filter_by(reset_token=token).first()
     
     if not usuario or not usuario.is_reset_token_valid(token):

@@ -3,12 +3,18 @@ Rotas de Campanhas
 Define os endpoints para listagem e criação de campanhas
 """
 
-from flask import Blueprint, request, jsonify
+from flask import Blueprint, request, jsonify, g
 from flask_jwt_extended import jwt_required, get_jwt_identity
 from app.controllers import campanha_controller
 from utils.decorators import admin_required
-
 from app.utils.admin_logger import with_admin_log
+from app.utils.validate_body import validate_body
+from app.schemas import (
+    CriarCampanhaSchema,
+    AtualizarCampanhaSchema,
+    TitulosPremiadosSchema,
+    GanhadorSchema,
+)
 
 campanha_bp = Blueprint('campanhas', __name__, url_prefix='/api/campanhas')
 
@@ -19,7 +25,7 @@ def listar_campanhas():
     status = request.args.get('status', None)
     page = request.args.get('page', 1, type=int)
     per_page = request.args.get('per_page', 20, type=int)
-    
+
     response, status_code = campanha_controller.listar_campanhas(status, page, per_page)
     return jsonify(response), status_code
 
@@ -41,9 +47,10 @@ def listar_titulos_premiados(slug):
 @campanha_bp.route('/<campanha_id>/titulos-premiados', methods=['POST'])
 @jwt_required()
 @admin_required()
+@validate_body(TitulosPremiadosSchema)
 def adicionar_titulo_premiado(campanha_id):
     """Endpoint para adicionar título premiado (admin only)"""
-    data = request.get_json()
+    data = g.validated_data
     response, status = campanha_controller.adicionar_titulo_premiado(campanha_id, data)
     return jsonify(response), status
 
@@ -60,11 +67,12 @@ def deletar_titulo_premiado(titulo_id):
 @campanha_bp.route('', methods=['POST'])
 @jwt_required()
 @admin_required()
+@validate_body(CriarCampanhaSchema)
 @with_admin_log("Criação de Campanha")
 def criar_campanha():
     """Endpoint para criar nova campanha (admin only)"""
     usuario_id = get_jwt_identity()
-    data = request.get_json()
+    data = g.validated_data
     response, status = campanha_controller.criar_campanha(usuario_id, data)
     return jsonify(response), status
 
@@ -72,11 +80,12 @@ def criar_campanha():
 @campanha_bp.route('/<campanha_id>', methods=['PUT'])
 @jwt_required()
 @admin_required()
+@validate_body(AtualizarCampanhaSchema)
 @with_admin_log("Atualização de Campanha")
 def atualizar_campanha(campanha_id):
     """Endpoint para atualizar campanha (admin only) - aceita UUID"""
     usuario_id = get_jwt_identity()
-    data = request.get_json()
+    data = g.validated_data
     response, status = campanha_controller.atualizar_campanha(usuario_id, campanha_id, data)
     return jsonify(response), status
 
@@ -86,9 +95,21 @@ def atualizar_campanha(campanha_id):
 @admin_required()
 @with_admin_log("Exclusão de Campanha")
 def deletar_campanha(campanha_id):
-    """Endpoint para deletar campanha (admin only) - aceita UUID"""
+    """Soft delete por padrão; hard delete com ?permanente=true (admin only)"""
     usuario_id = get_jwt_identity()
-    response, status = campanha_controller.deletar_campanha(usuario_id, campanha_id)
+    permanente = request.args.get('permanente', 'false').lower() == 'true'
+    response, status = campanha_controller.deletar_campanha(usuario_id, campanha_id, permanente=permanente)
+    return jsonify(response), status
+
+
+@campanha_bp.route('/<campanha_id>/restaurar', methods=['POST'])
+@jwt_required()
+@admin_required()
+@with_admin_log("Restauração de Campanha")
+def restaurar_campanha(campanha_id):
+    """Restaura campanha removida via soft delete (admin only)"""
+    usuario_id = get_jwt_identity()
+    response, status = campanha_controller.restaurar_campanha(usuario_id, campanha_id)
     return jsonify(response), status
 
 
@@ -105,9 +126,10 @@ def buscar_compradores(campanha_id):
 @campanha_bp.route('/<campanha_id>/ganhador', methods=['POST'])
 @jwt_required()
 @admin_required()
+@validate_body(GanhadorSchema)
 @with_admin_log("Definição de Ganhador")
 def definir_ganhador(campanha_id):
     """Endpoint para definir ganhador de uma campanha (admin only)"""
-    data = request.get_json()
+    data = g.validated_data
     response, status = campanha_controller.definir_ganhador(campanha_id, data)
     return jsonify(response), status
